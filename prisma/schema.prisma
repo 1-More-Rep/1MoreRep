@@ -1,0 +1,20 @@
+// 1MoreRep — Prisma schema.
+// Models are added phase-by-phase per the master plan. P0 establishes the
+// datasource/generator and a minimal AppMeta table (bootstrap markers, schema
+// version) so migrations and the health check have something concrete to target.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Key/value application metadata (e.g. seed markers, schema bootstrap flags).
+model AppMeta {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}

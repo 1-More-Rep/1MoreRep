@@ -1,0 +1,45 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+
+# testing
+/coverage
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
+
+# misc
+.DS_Store
+*.pem
+*.tsbuildinfo
+
+# debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# env / secrets — NEVER commit real secrets
+.env
+.env*.local
+.env.production
+
+# prisma
+/prisma/*.db
+/prisma/*.db-journal
+
+# local data volumes (uploads, etc.)
+/data
+
+# claude code harness config (local)
+/.claude/

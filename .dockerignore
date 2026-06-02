@@ -1,0 +1,17 @@
+node_modules
+.next
+.git
+.gitignore
+coverage
+test-results
+playwright-report
+blob-report
+.env
+.env*.local
+data
+design
+**/*.md
+!README.md
+Dockerfile
+docker-compose.yml
+.dockerignore
