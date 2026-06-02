@@ -7,6 +7,7 @@ import {
   Space_Mono,
   IBM_Plex_Mono,
 } from 'next/font/google';
+import { headers } from 'next/headers';
 import './globals.css';
 import { ThemeProvider, themeBootScript } from '@/components/theme/ThemeProvider';
 
@@ -34,12 +35,13 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     <html lang="en" data-theme="light" data-icon-style="soft" className={fontVars}>
       <head>
         {/* Apply stored theme before first paint to avoid a flash of default theme. */}
-        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body>
         <ThemeProvider>{children}</ThemeProvider>

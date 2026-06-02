@@ -1,7 +1,5 @@
-// 1MoreRep — Prisma schema.
-// Models are added phase-by-phase per the master plan. P0 establishes the
-// datasource/generator and a minimal AppMeta table (bootstrap markers, schema
-// version) so migrations and the health check have something concrete to target.
+// 1MoreRep — Prisma schema. Models grow phase-by-phase per the master plan.
+// P0: AppMeta. P2: identity / auth / sessions / tokens / instance settings / audit.
 
 generator client {
   provider = "prisma-client-js"
@@ -12,9 +10,160 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Key/value application metadata (e.g. seed markers, schema bootstrap flags).
+/// Key/value application metadata (seed markers, schema bootstrap flags).
 model AppMeta {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Identity & auth (P2)
+// ---------------------------------------------------------------------------
+
+enum Role {
+  SUPERADMIN
+  ADMIN
+  USER
+}
+
+enum UserStatus {
+  INVITED // created by an admin, not yet activated
+  ACTIVE
+  DEACTIVATED // soft-disabled; cannot log in, data retained
+}
+
+enum TokenType {
+  INVITE
+  EMAIL_VERIFY
+  LOGIN_LINK
+  PASSWORD_RESET
+  EMAIL_CHANGE
+}
+
+enum UnitSystem {
+  METRIC
+  IMPERIAL
+}
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique // stored normalized (lowercased, trimmed)
+  emailVerifiedAt DateTime?
+  passwordHash    String? // null until set; magic-link-only users are allowed
+  role            Role       @default(USER)
+  status          UserStatus @default(INVITED)
+
+  displayName String
+  avatarKey   String? // object-store key, never a public path
+  unitSystem  UnitSystem @default(METRIC)
+
+  // Public profile surface (leaderboards) — explicit, opt-in.
+  isProfilePublic Boolean @default(false)
+  publicHandle    String? @unique
+
+  mustChangePassword Boolean   @default(false)
+  failedLoginCount   Int       @default(0)
+  lockedUntil        DateTime?
+  pendingEmail       String? // set during EMAIL_CHANGE, promoted on confirm
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+
+  invitedById String?
+  invitedBy   User?   @relation("Invites", fields: [invitedById], references: [id])
+  invitees    User[]  @relation("Invites")
+
+  sessions    Session[]
+  authTokens  AuthToken[]
+  auditEvents AuditEvent[] @relation("ActorEvents")
+
+  @@index([role])
+  @@index([status])
+}
+
+model Session {
+  id                String   @id // opaque random id (cookie = id.secret)
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hashedSecret      String // sha256 of the session secret; raw secret never stored
+  createdAt         DateTime @default(now())
+  lastUsedAt        DateTime @default(now())
+  absoluteExpiresAt DateTime
+  idleExpiresAt     DateTime
+  ipHash            String? // HMAC(ip), not raw
+  userAgent         String?
+  label             String?
+
+  @@index([userId])
+  @@index([idleExpiresAt])
+}
+
+model AuthToken {
+  id            String    @id @default(cuid())
+  type          TokenType
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hashedToken   String    @unique // sha256(rawToken); raw token only in the email link
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  payload       Json? // minimal, validated (e.g. { newEmail } for EMAIL_CHANGE)
+  createdAt     DateTime  @default(now())
+  requestIpHash String?
+
+  @@index([userId, type])
+  @@index([expiresAt])
+}
+
+/// Single-row (id = 1) instance configuration. Secrets stored AES-256-GCM encrypted.
+model InstanceSettings {
+  id Int @id @default(1)
+
+  brandName         String     @default("1MoreRep")
+  brandLogoKey      String?
+  themeColor        String     @default("#e2553a")
+  defaultUnitSystem UnitSystem @default(METRIC)
+
+  allowSelfRegistration    Boolean @default(false)
+  requireEmailVerification Boolean @default(true)
+
+  // SMTP (password encrypted-at-rest)
+  smtpHost        String?
+  smtpPort        Int?
+  smtpUser        String?
+  smtpPasswordEnc String?
+  smtpFrom        String?
+  smtpSecure      Boolean @default(true)
+
+  // LLM (Ollama default; remote keys encrypted)
+  llmProvider String  @default("NONE") // NONE | OLLAMA | ANTHROPIC | OPENAI
+  llmBaseUrl  String? @default("http://ollama:11434")
+  llmModel    String? @default("llama3.1")
+  llmApiKeyEnc String?
+  llmTimeoutMs Int    @default(20000)
+
+  // Web Push VAPID (private key encrypted)
+  vapidPublicKey     String?
+  vapidPrivateKeyEnc String?
+  vapidSubject       String?
+
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("ActorEvents", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String // e.g. "auth.login.success", "user.invite", "settings.update"
+  targetType String?
+  targetId   String?
+  metadata   Json? // redacted; never secrets/tokens
+  ipHash     String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
 }

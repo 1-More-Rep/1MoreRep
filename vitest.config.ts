@@ -23,6 +23,10 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      'server-only': fileURLToPath(new URL('./src/test/noop.ts', import.meta.url)),
+      'client-only': fileURLToPath(new URL('./src/test/noop.ts', import.meta.url)),
+    },
   },
 });

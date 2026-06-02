@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('P0 smoke', () => {
-  test('landing renders the brand wordmark', async ({ page }) => {
+  test('root redirects unauthenticated users to login (branded)', async ({ page }) => {
     await page.goto('/');
-    await expect(page.getByTestId('brand-wordmark')).toHaveText('1MoreRep');
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   });
 
   test('health endpoint responds', async ({ request }) => {

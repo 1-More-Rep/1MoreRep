@@ -31,8 +31,8 @@ test.describe('P1 design system', () => {
     expect(accent).toBe('#2f6bff');
   });
 
-  test('app shell renders nav (placeholder Today)', async ({ page }) => {
+  test('protected /app redirects unauthenticated users to /login', async ({ page }) => {
     await page.goto('/app');
-    await expect(page.getByRole('navigation', { name: 'Primary' }).first()).toBeVisible();
+    await expect(page).toHaveURL(/\/login/);
   });
 });

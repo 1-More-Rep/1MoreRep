@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Icon } from '@/components/ui/Icon';
 import { Btn } from '@/components/ui/Btn';
 import { SectionLabel } from '@/components/ui/typography';
+import { LogoutButton } from '@/components/auth/LogoutButton';
 import { SIDEBAR_NAV, isActive } from './navConfig';
 
 export function DesktopSidebar() {
@@ -86,7 +87,7 @@ export function DesktopSidebar() {
         })}
       </div>
 
-      <div style={{ marginTop: 'auto' }}>
+      <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Link
           href="/app/settings"
           aria-current={isActive(pathname, '/app/settings') ? 'page' : undefined}
@@ -104,6 +105,7 @@ export function DesktopSidebar() {
           <Icon name="settings" size={19} stroke={1.8} />
           Settings
         </Link>
+        <LogoutButton />
       </div>
     </nav>
   );
