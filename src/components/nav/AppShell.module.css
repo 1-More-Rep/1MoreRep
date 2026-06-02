@@ -1,0 +1,51 @@
+.shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  display: flex;
+}
+
+.sidebar {
+  display: none;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.content {
+  flex: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--screen-pad);
+  /* room for the mobile tab bar */
+  padding-bottom: calc(var(--screen-pad) + 84px);
+}
+
+.tabbar {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+}
+
+/* Desktop: show sidebar, hide tab bar */
+@media (min-width: 880px) {
+  .sidebar {
+    display: block;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    height: 100dvh;
+  }
+  .tabbar {
+    display: none;
+  }
+  .content {
+    padding-bottom: var(--screen-pad);
+  }
+}
