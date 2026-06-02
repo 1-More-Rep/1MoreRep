@@ -1,7 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Build a self-contained server bundle for the Docker runtime image.
-  output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
   experimental: {

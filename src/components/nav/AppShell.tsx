@@ -8,11 +8,11 @@ import styles from './AppShell.module.css';
  * Both nav variants are always rendered; CSS shows the right one per breakpoint
  * (avoids layout shift / JS-dependent nav).
  */
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, isAdmin = false }: { children: ReactNode; isAdmin?: boolean }) {
   return (
     <div className={styles.shell}>
       <div className={styles.sidebar}>
-        <DesktopSidebar />
+        <DesktopSidebar isAdmin={isAdmin} />
       </div>
       <div className={styles.main}>
         <div className={styles.content}>{children}</div>

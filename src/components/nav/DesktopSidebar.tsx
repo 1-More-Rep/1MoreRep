@@ -8,7 +8,7 @@ import { SectionLabel } from '@/components/ui/typography';
 import { LogoutButton } from '@/components/auth/LogoutButton';
 import { SIDEBAR_NAV, isActive } from './navConfig';
 
-export function DesktopSidebar() {
+export function DesktopSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
   return (
     <nav
@@ -88,6 +88,24 @@ export function DesktopSidebar() {
       </div>
 
       <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {isAdmin && (
+          <Link
+            href="/admin"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 11,
+              padding: '10px 12px',
+              borderRadius: 'var(--r-sm)',
+              textDecoration: 'none',
+              fontSize: 14.5,
+              color: 'var(--text-2)',
+            }}
+          >
+            <Icon name="trophy" size={19} stroke={1.8} />
+            Admin
+          </Link>
+        )}
         <Link
           href="/app/settings"
           aria-current={isActive(pathname, '/app/settings') ? 'page' : undefined}
