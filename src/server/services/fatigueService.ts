@@ -70,14 +70,6 @@ function etaToDate(now: Date, hours: number): Date | null {
   return hours > 0 ? new Date(now.getTime() + hours * HOUR) : null;
 }
 
-/** Convenience: per-muscle fatigue number (0..1) for the body map. */
-export async function getFatigueByMuscle(userId: string, now: Date = new Date()): Promise<Record<Muscle, number>> {
-  const f = await computeAndCacheFatigue(userId, now);
-  const out = {} as Record<Muscle, number>;
-  for (const m of MUSCLES) out[m] = f[m].fatigue;
-  return out;
-}
-
 export async function reportSoreness(userId: string, muscle: Muscle, severity: number): Promise<void> {
   await prisma.sorenessReport.create({ data: { ownerId: userId, muscle, severity: Math.max(0, Math.min(10, Math.round(severity))) } });
 }

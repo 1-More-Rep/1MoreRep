@@ -3,23 +3,25 @@
 import { useState } from 'react';
 import type { Muscle } from '@/domain/muscles/taxonomy';
 import { MUSCLE_LABEL } from '@/domain/muscles/taxonomy';
+import { fatigueToTint } from '@/domain/fatigue/model';
 import { Btn } from '@/components/ui/Btn';
 
 type View = 'front' | 'back';
 
 function fill(f: number | undefined): string {
-  const v = f ?? 0;
-  if (v < 0.12) return 'var(--surface-2)';
-  const pct = Math.round(Math.min(1, v) * 100);
-  return `color-mix(in oklab, var(--accent) ${pct}%, var(--surface-2))`;
+  const { cssVar, alpha } = fatigueToTint(f ?? 0);
+  return `color-mix(in oklab, var(${cssVar}) ${Math.round(alpha * 100)}%, var(--surface-2))`;
 }
 
 export function BodyMap({
   fatigue,
+  etaHours,
   onSelect,
   selected,
 }: {
   fatigue: Partial<Record<Muscle, number>>;
+  /** Optional per-muscle recovery ETA (hours) — appended to the region aria-label. */
+  etaHours?: Partial<Record<Muscle, number>>;
   onSelect?: (m: Muscle) => void;
   selected?: Muscle | null;
 }) {
@@ -27,12 +29,14 @@ export function BodyMap({
 
   function Region({ muscle, children }: { muscle: Muscle; children: React.ReactNode }) {
     const isSel = selected === muscle;
+    const eta = etaHours?.[muscle];
+    const label = `${MUSCLE_LABEL[muscle]}, ${Math.round((fatigue[muscle] ?? 0) * 100)}% fatigued${eta != null && eta > 0 ? `, recovers ~${Math.round(eta)}h` : ''}`;
     return (
       <g
         role="button"
         tabIndex={0}
         className="bodymap-region"
-        aria-label={`${MUSCLE_LABEL[muscle]}, ${Math.round((fatigue[muscle] ?? 0) * 100)}% fatigued`}
+        aria-label={label}
         onClick={() => onSelect?.(muscle)}
         onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelect?.(muscle)}
         style={{ cursor: onSelect ? 'pointer' : 'default', fill: fill(fatigue[muscle]), stroke: isSel ? 'var(--accent)' : 'var(--line-2)', strokeWidth: isSel ? 1.6 : 0.7, transition: 'fill .3s' }}

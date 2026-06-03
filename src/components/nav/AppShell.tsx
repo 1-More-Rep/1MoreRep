@@ -11,11 +11,12 @@ import styles from './AppShell.module.css';
 export function AppShell({ children, isAdmin = false }: { children: ReactNode; isAdmin?: boolean }) {
   return (
     <div className={styles.shell}>
+      <a href="#main" className={styles.skipLink}>Skip to content</a>
       <div className={styles.sidebar}>
         <DesktopSidebar isAdmin={isAdmin} />
       </div>
       <div className={styles.main}>
-        <div className={styles.content}>{children}</div>
+        <main id="main" className={styles.content}>{children}</main>
         <div className={styles.tabbar}>
           <MobileTabBar />
         </div>

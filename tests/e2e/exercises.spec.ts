@@ -24,4 +24,26 @@ test.describe('P4 exercise library', () => {
     await expect(page.getByText(/result/)).toBeVisible();
     await expect(page.getByRole('link').filter({ hasText: /./ }).first()).toBeVisible();
   });
+
+  test('creates a custom exercise and finds it again', async ({ page }) => {
+    // Unique name so re-runs don't collide on the same library entry.
+    const name = `E2E Custom Lift ${Date.now()}`;
+
+    await page.goto('/app/exercises/new');
+    await expect(page.getByRole('heading', { name: 'New exercise' })).toBeVisible();
+
+    await page.getByLabel('Name').fill(name);
+    await page.getByLabel('Equipment').selectOption('DUMBBELL');
+    await page.getByLabel('Primary muscle').selectOption('BICEPS');
+    await page.getByRole('button', { name: 'Create exercise' }).click();
+
+    // The create action redirects to the new exercise's detail page.
+    await page.waitForURL(/\/app\/exercises\/[^/]+$/);
+    await expect(page.getByRole('heading', { name, level: 1 })).toBeVisible();
+
+    // And it is searchable back in the library.
+    await page.goto('/app/exercises');
+    await page.getByLabel('Search exercises').fill(name);
+    await expect(page.getByRole('link', { name: new RegExp(name, 'i') }).first()).toBeVisible();
+  });
 });

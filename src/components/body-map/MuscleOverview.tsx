@@ -75,13 +75,14 @@ export function MuscleOverview({ data, topExercises }: { data: Record<Muscle, Mu
   const [selected, setSelected] = useState<Muscle | null>(null);
   const [pending, start] = useTransition();
   const fatigueMap = Object.fromEntries(Object.entries(data).map(([m, v]) => [m, v.fatigue])) as Record<Muscle, number>;
+  const etaMap = Object.fromEntries(Object.entries(data).map(([m, v]) => [m, v.recoveryEtaHours])) as Record<Muscle, number>;
 
   const info = selected ? data[selected] : null;
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 'var(--gap)' }}>
       <Card>
-        <BodyMap fatigue={fatigueMap} onSelect={setSelected} selected={selected} />
+        <BodyMap fatigue={fatigueMap} etaHours={etaMap} onSelect={setSelected} selected={selected} />
       </Card>
 
       {selected && info ? (

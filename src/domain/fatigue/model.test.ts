@@ -5,6 +5,7 @@ import {
   decayFactor,
   recoveryEtaHours,
   computeFatigue,
+  fatigueToTint,
   type SetInput,
 } from './model';
 import { HALF_LIFE_HOURS, MUSCLE_REF_STIMULUS } from '../muscles/taxonomy';
@@ -78,5 +79,14 @@ describe('recoveryEtaHours', () => {
   });
   it('is zero when already fresh', () => {
     expect(recoveryEtaHours('CHEST', 0.2)).toBe(0);
+  });
+});
+
+describe('fatigueToTint (W5-T6)', () => {
+  it('reads fresh muscles as no tint, ramps accent with fatigue', () => {
+    expect(fatigueToTint(0.05)).toEqual({ cssVar: '--accent', alpha: 0 }); // below the 12% floor
+    expect(fatigueToTint(0.6)).toEqual({ cssVar: '--accent', alpha: 0.6 });
+    expect(fatigueToTint(1.5).alpha).toBe(1); // clamped
+    expect(fatigueToTint(-0.3).alpha).toBe(0); // clamped
   });
 });

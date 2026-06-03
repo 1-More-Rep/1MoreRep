@@ -23,18 +23,23 @@ export default async function MusclePage() {
     };
   }
 
-  // Top exercises per muscle (primary), for the "train it" links.
+  // Top exercises per muscle (primary), relevance-ranked by muscle-link weight.
   const exercises = await prisma.exercise.findMany({
     where: { ownerId: null, muscleLinks: { some: { role: 'PRIMARY' } } },
     include: { muscleLinks: { where: { role: 'PRIMARY' } } },
     take: 400,
-    orderBy: { name: 'asc' },
   });
-  const topExercises: Record<string, { id: string; name: string }[]> = {};
+  const ranked: Record<string, { id: string; name: string; weight: number }[]> = {};
   for (const ex of exercises) {
     for (const link of ex.muscleLinks) {
-      (topExercises[link.muscle] ??= []).push({ id: ex.id, name: ex.name });
+      (ranked[link.muscle] ??= []).push({ id: ex.id, name: ex.name, weight: link.weight });
     }
+  }
+  const topExercises: Record<string, { id: string; name: string }[]> = {};
+  for (const [muscle, list] of Object.entries(ranked)) {
+    topExercises[muscle] = list
+      .sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name))
+      .map(({ id, name }) => ({ id, name }));
   }
 
   return (

@@ -38,6 +38,28 @@ describe('timezone-correct date keys', () => {
     expect(dayKey(new Date('2026-03-08T12:00:00Z'), 'America/New_York')).toBe('2026-03-08');
   });
 
+  it('handles extreme offsets (+13 Tongatapu, -8 Pitcairn) at the UTC-midnight edge (W5-T4)', () => {
+    const justAfterUtcMidnight = new Date('2026-06-02T00:30:00Z');
+    expect(dayKey(justAfterUtcMidnight, 'Pacific/Tongatapu')).toBe('2026-06-02'); // +13 → already next-day afternoon
+    expect(dayKey(justAfterUtcMidnight, 'Pacific/Pitcairn')).toBe('2026-06-01'); // -8 → still previous day
+  });
+
+  it('gives a traveler different day keys for the same instant (W5-T4)', () => {
+    const instant = new Date('2026-06-02T23:00:00Z'); // Auckland → Jun 3, LA → Jun 2
+    expect(dayKey(instant, 'Pacific/Auckland')).toBe('2026-06-03');
+    expect(dayKey(instant, 'America/Los_Angeles')).toBe('2026-06-02');
+    expect(dayKey(instant, 'Pacific/Auckland')).not.toBe(dayKey(instant, 'America/Los_Angeles'));
+  });
+
+  it('keeps a single calendar day across a 25-hour fall-back day (W5-T4)', () => {
+    // America/New_York DST ends 2026-11-01; that local day spans 25 hours.
+    const morning = new Date('2026-11-01T08:00:00Z'); // ~04:00 EDT
+    const evening = new Date('2026-11-02T03:00:00Z'); // ~22:00 EST same local day
+    expect(dayKey(morning, 'America/New_York')).toBe('2026-11-01');
+    expect(dayKey(evening, 'America/New_York')).toBe('2026-11-01');
+    expect(daysBetween(dayKey(morning, 'America/New_York'), '2026-11-02')).toBe(1);
+  });
+
   it('groups ISO weeks Mon..Sun', () => {
     const mon = new Date('2026-06-01T12:00:00Z');
     const sun = new Date('2026-06-07T12:00:00Z');

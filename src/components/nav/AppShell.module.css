@@ -5,6 +5,24 @@
   display: flex;
 }
 
+/* Visually hidden until focused (WCAG 2.4.1 bypass-blocks). */
+.skipLink {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: var(--r-sm);
+  background: var(--accent-strong);
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.skipLink:focus {
+  left: 8px;
+}
+
 .sidebar {
   display: none;
 }

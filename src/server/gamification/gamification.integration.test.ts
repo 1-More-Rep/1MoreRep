@@ -114,7 +114,7 @@ d('league settlement', () => {
     await prisma.leagueMembership.createMany({ data: userIds.map((id, i) => ({ cohortId, userId: id, weeklyXp: (30 - i) * 10 })) });
   });
   afterAll(async () => {
-    await prisma.jobRun.deleteMany({ where: { periodKey: wk } });
+    await prisma.jobRun.deleteMany({ where: { periodKey: { in: [wk, '2099-W02'] } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   });
 
@@ -132,6 +132,19 @@ d('league settlement', () => {
     // idempotent: a settled run is a no-op
     const r2 = await settleLeagues(wk);
     expect(r2.settled).toBe(0);
+  });
+
+  it('recovers a crashed (stuck-RUNNING) settlement run (W5-T4)', async () => {
+    const wk2 = '2099-W02';
+    const cohort2 = await prisma.leagueCohort.create({ data: { tier: 'GOLD', weekKey: wk2, status: 'ACTIVE' } });
+    await prisma.leagueMembership.createMany({ data: userIds.map((id, i) => ({ cohortId: cohort2.id, userId: id, weeklyXp: (30 - i) * 10 })) });
+    // simulate a crash mid-run: JobRun left RUNNING while the cohort is still ACTIVE
+    await prisma.jobRun.create({ data: { job: 'league.settle', periodKey: wk2, status: 'RUNNING' } });
+
+    const r = await settleLeagues(wk2); // must NOT short-circuit (status != OK) and should finish the work
+    expect(r.settled).toBe(1);
+    expect((await prisma.leagueCohort.findUniqueOrThrow({ where: { id: cohort2.id } })).status).toBe('SETTLED');
+    expect((await prisma.jobRun.findUniqueOrThrow({ where: { job_periodKey: { job: 'league.settle', periodKey: wk2 } } })).status).toBe('OK');
   });
 });
 

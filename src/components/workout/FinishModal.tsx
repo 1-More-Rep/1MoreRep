@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { finishWorkoutAction, getWorkoutDiffAction } from '@/server/actions/workout';
 import type { RoutineDiff } from '@/domain/routine/diff';
 import type { SaveMode } from '@/server/services/sessionService';
@@ -25,6 +25,9 @@ export function FinishModal({
   const [name, setName] = useState(defaultName);
   const [notes, setNotes] = useState('');
   const [pending, startTx] = useTransition();
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!fromRoutine) {
@@ -36,6 +39,44 @@ export function FinishModal({
       .finally(() => setLoading(false));
   }, [sessionId, fromRoutine]);
 
+  // Dialog a11y (WCAG 2.1.2 / 2.4.3): initial focus, focus trap, Escape, focus restore.
+  useEffect(() => {
+    const prevFocus = document.activeElement as HTMLElement | null;
+    const focusables = () => {
+      const root = sheetRef.current;
+      if (!root) return [] as HTMLElement[];
+      return Array.from(
+        root.querySelectorAll<HTMLElement>('button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'),
+      ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+    };
+    focusables()[0]?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (e.key === 'Tab') {
+        const els = focusables();
+        if (els.length === 0) return;
+        const first = els[0]!;
+        const last = els[els.length - 1]!;
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      prevFocus?.focus?.();
+    };
+  }, []);
+
   function finish(saveMode: SaveMode) {
     startTx(() => finishWorkoutAction(sessionId, { saveMode, newRoutineName: name, durationSec, notes: notes.trim() || undefined }));
   }
@@ -44,7 +85,7 @@ export function FinishModal({
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Finish workout" style={overlay} onClick={onClose}>
-      <div style={sheet} onClick={(e) => e.stopPropagation()}>
+      <div ref={sheetRef} style={sheet} onClick={(e) => e.stopPropagation()}>
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>Finish workout</h2>
 
         {loading ? (

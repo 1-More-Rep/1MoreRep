@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { prisma } from '@/server/db/prisma';
 import { MUSCLES } from '@/domain/muscles/taxonomy';
+import { seedExercises } from '../../../prisma/seed/exercises';
 
 let dbReachable = false;
 try {
@@ -24,6 +25,15 @@ d('exercise library (seeded DB)', () => {
       expect(usedSet.has(m), `no exercise targets ${m}`).toBe(true);
     }
   });
+
+  it('re-running the seed creates nothing (idempotent, P4 gate)', async () => {
+    // Race-immune: the seed keys on sourceId, so a re-run over an already-seeded
+    // DB must create 0 and skip the whole dataset (a plain count() is polluted by
+    // concurrent test fixtures that default source to FREE_EXERCISE_DB).
+    const r = await seedExercises(prisma);
+    expect(r.created).toBe(0);
+    expect(r.skipped).toBeGreaterThan(800);
+  }, 90_000);
 
   it('the bench press has curated chest-dominant weights', async () => {
     const bench = await prisma.exercise.findFirst({

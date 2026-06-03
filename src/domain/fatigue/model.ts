@@ -121,7 +121,12 @@ export function computeFatigue(
   return result;
 }
 
-/** Map a fatigue value (0..1) to a 0..1 intensity for the body-map heat tint. */
-export function fatigueIntensity(fatigue: number): number {
-  return clamp01(fatigue);
+/**
+ * Map a fatigue value (0..1) to the body-map heat tint: an accent CSS variable
+ * mixed over the surface by `alpha` (0..1). Fresh muscles (<12%) read as no tint.
+ * Single source of truth for the threshold mapping (consumed by BodyMap).
+ */
+export function fatigueToTint(fatigue: number): { cssVar: string; alpha: number } {
+  const v = clamp01(fatigue);
+  return { cssVar: '--accent', alpha: v < 0.12 ? 0 : v };
 }

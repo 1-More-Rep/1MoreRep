@@ -50,6 +50,14 @@ d('fatigue service (DB)', () => {
     expect(snaps).toHaveLength(19);
     for (const s of snaps) {
       expect(s.fatigue).toBeCloseTo(computed[s.muscle].fatigue, 6);
+      // recoveryEtaAt parity (W5-T4): persisted ETA matches now + computed hours, null when fresh.
+      const hours = computed[s.muscle].recoveryEtaHours;
+      if (hours > 0) {
+        expect(s.recoveryEtaAt).not.toBeNull();
+        expect(Math.abs(s.recoveryEtaAt!.getTime() - (now.getTime() + hours * 3600_000))).toBeLessThan(1000);
+      } else {
+        expect(s.recoveryEtaAt).toBeNull();
+      }
     }
   });
 
