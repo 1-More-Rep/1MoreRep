@@ -48,6 +48,7 @@ const AUTH_ROUTES = [
 
 test.describe('P12 accessibility (unauthenticated)', () => {
   test('public screens have no moderate+ violations', async ({ page }) => {
+    test.slow(); // several routes audited sequentially (goto + networkidle + axe each)
     for (const url of UNAUTH_ROUTES) {
       await expectClean(page, url);
     }
@@ -58,6 +59,7 @@ test.describe('P12 accessibility (authenticated)', () => {
   test.use({ storageState: STORAGE_STATE });
 
   test('static app screens have no moderate+ violations', async ({ page }) => {
+    test.setTimeout(180_000); // ~20 routes audited sequentially (goto + networkidle + axe each)
     for (const url of AUTH_ROUTES) {
       await expectClean(page, url);
     }

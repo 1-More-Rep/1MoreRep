@@ -39,7 +39,7 @@ export async function generateViewport(): Promise<Viewport> {
     themeColor,
     width: 'device-width',
     initialScale: 1,
-    maximumScale: 1,
+    // No maximumScale/userScalable lock — users must be able to zoom (WCAG 1.4.4 / axe meta-viewport).
   };
 }
 

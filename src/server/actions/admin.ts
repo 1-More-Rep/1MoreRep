@@ -17,8 +17,9 @@ import { audit } from '@/lib/auth/audit';
 import { getRequestContext } from '@/lib/request';
 import { emailSchema } from '@/lib/validation/auth';
 
-/** Providers with a working adapter today. ANTHROPIC/OPENAI are stubbed (not yet implemented). */
-export const SUPPORTED_LLM_PROVIDERS = ['NONE', 'OLLAMA'] as const;
+// Providers with a working adapter today. ANTHROPIC/OPENAI are stubbed (not yet
+// implemented). Kept un-exported: a 'use server' file may only export async fns.
+const SUPPORTED_LLM_PROVIDERS = ['NONE', 'OLLAMA'] as const;
 const llmProviderSchema = z.enum(SUPPORTED_LLM_PROVIDERS);
 
 export interface AdminState {

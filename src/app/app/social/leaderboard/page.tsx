@@ -19,7 +19,7 @@ function Row({ rank, name, value, isSelf, unit, pinned }: { rank: number; name: 
       <Mono style={{ width: 36, color: rank <= 3 ? 'var(--accent-text)' : 'var(--text-3)', fontWeight: 700 }}>{rank}</Mono>
       <span style={{ flex: 1, fontSize: 14.5, fontWeight: isSelf ? 700 : 500 }}>{name}{isSelf ? ' (you)' : ''}{pinned ? ' · your rank' : ''}</span>
       <Mono style={{ fontWeight: 600 }}>{value.toLocaleString()}</Mono>
-      <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{unit}</span>
+      <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{unit}</span>
     </div>
   );
 }

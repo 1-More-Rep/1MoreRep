@@ -34,6 +34,9 @@ test.describe('P11 PWA & push', () => {
   test('onboarding completes into the generator', async ({ page }) => {
     await page.goto('/onboarding');
     await expect(page.getByRole('heading', { name: /Welcome/ })).toBeVisible();
+    // Multi-step wizard: choose a goal on step 1, then Skip jumps to the final step.
+    await page.getByRole('button', { name: 'Get stronger' }).click();
+    await page.getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: 'Generate my first workout' }).click();
     await page.waitForURL(/\/app\/workout\/generate/);
   });

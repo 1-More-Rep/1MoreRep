@@ -19,6 +19,9 @@ export default async function globalSetup() {
       where: { id: 1 },
       data: { allowSelfRegistration: false, requireEmailVerification: true, brandName: '1MoreRep' },
     });
+    // Reset the superadmin's onboarding flag so the onboarding E2E is repeatable
+    // across runs (a completed onboarding would otherwise redirect /onboarding → /app).
+    await prisma.user.updateMany({ where: { email: SUPERADMIN.email }, data: { onboardedAt: null } });
 
     // a second user (with a handle) for friends/social E2E
     await prisma.user.upsert({

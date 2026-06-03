@@ -7,8 +7,9 @@ test.describe('P9 social', () => {
   test('friends page: add a friend by handle', async ({ page }) => {
     await page.goto('/app/social/friends');
     await expect(page.getByRole('heading', { name: 'Friends' })).toBeVisible();
-    await page.getByLabel('Handle').fill('frienduser');
-    await page.getByRole('button', { name: 'Send request' }).click();
+    // Live typeahead: type a handle (>=2 chars), then click "Add" on the result.
+    await page.getByLabel('Search by @handle').fill('frienduser');
+    await page.getByRole('button', { name: 'Add' }).click();
     await expect(page.getByText(/Friend request sent|already pending|Already friends/i)).toBeVisible();
   });
 
