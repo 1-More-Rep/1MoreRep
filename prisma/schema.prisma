@@ -78,6 +78,7 @@ model User {
   sessions    Session[]
   authTokens  AuthToken[]
   auditEvents AuditEvent[] @relation("ActorEvents")
+  exercises   Exercise[] // custom exercises owned by this user
 
   @@index([role])
   @@index([status])
@@ -166,4 +167,112 @@ model AuditEvent {
   @@index([actorId])
   @@index([action])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Exercise library & muscle taxonomy (P4)
+// ---------------------------------------------------------------------------
+
+/// Closed muscle set — mirrors src/domain/muscles/taxonomy.ts MUSCLES (keep in sync).
+enum Muscle {
+  CHEST
+  FRONT_DELTS
+  SIDE_DELTS
+  REAR_DELTS
+  BICEPS
+  TRICEPS
+  FOREARMS
+  LATS
+  TRAPS
+  RHOMBOIDS
+  LOWER_BACK
+  ABS
+  OBLIQUES
+  QUADS
+  HAMSTRINGS
+  GLUTES
+  CALVES
+  ADDUCTORS
+  NECK
+}
+
+enum Equipment {
+  BARBELL
+  DUMBBELL
+  MACHINE
+  CABLE
+  BODYWEIGHT
+  KETTLEBELL
+  BAND
+  EZ_BAR
+  BALL
+  OTHER
+}
+
+enum ExCategory {
+  STRENGTH
+  CARDIO
+  OLYMPIC
+  PLYOMETRICS
+  POWERLIFTING
+  STRETCHING
+  STRONGMAN
+  OTHER
+}
+
+enum Mechanic {
+  COMPOUND
+  ISOLATION
+}
+
+enum Force {
+  PUSH
+  PULL
+  STATIC
+}
+
+enum MuscleRole {
+  PRIMARY
+  SECONDARY
+}
+
+model Exercise {
+  id            String           @id @default(cuid())
+  slug          String
+  name          String
+  category      ExCategory       @default(STRENGTH)
+  equipment     Equipment        @default(OTHER)
+  mechanic      Mechanic?
+  force         Force?
+  level         String?
+  instructions  String[]
+  iconKey       String           @default("dumbbell")
+  defaultSets   Int              @default(3)
+  defaultRepLow Int              @default(8)
+  defaultRepHigh Int             @default(12)
+  defaultRestSec Int             @default(120)
+  isCustom      Boolean          @default(false)
+  ownerId       String?
+  owner         User?            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  source        String           @default("FREE_EXERCISE_DB")
+  sourceId      String?          @unique // original dataset id; makes reseed idempotent
+  muscleLinks   ExerciseMuscle[]
+  createdAt     DateTime         @default(now())
+
+  @@index([ownerId])
+  @@index([name])
+  @@index([equipment])
+}
+
+/// Weighted muscle contribution (bench: CHEST 1.0, FRONT_DELTS 0.5, TRICEPS 0.4).
+model ExerciseMuscle {
+  id         String     @id @default(cuid())
+  exerciseId String
+  exercise   Exercise   @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  muscle     Muscle
+  role       MuscleRole
+  weight     Float
+
+  @@unique([exerciseId, muscle])
+  @@index([muscle])
 }

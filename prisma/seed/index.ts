@@ -5,6 +5,7 @@
  */
 import { PrismaClient } from '@prisma/client';
 import { ensureSuperadmin } from './superadmin';
+import { seedExercises } from './exercises';
 
 const prisma = new PrismaClient();
 
@@ -18,6 +19,14 @@ async function main() {
         (boot.generated ? `  Password: ${boot.password}\n  (Save this now — it will not be shown again. Change it on first login.)\n` : `  Password: (as provided)\n`) +
         `════════════════════════════════════\n`,
     );
+  }
+
+  const ex = await seedExercises(prisma);
+  // eslint-disable-next-line no-console
+  console.log(`[seed] exercises: +${ex.created} new, ${ex.skipped} existing (of ${ex.total})`);
+  if (ex.unmappedMuscles.length) {
+    // eslint-disable-next-line no-console
+    console.warn('[seed] unmapped muscle strings:', ex.unmappedMuscles.join(', '));
   }
 
   await prisma.appMeta.upsert({
