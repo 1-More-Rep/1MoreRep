@@ -97,6 +97,8 @@ model User {
   activityEvents   ActivityEvent[]
   bodyMetrics      BodyMetric[]
   progressPhotos   ProgressPhoto[]
+  pushSubscriptions PushSubscription[]
+  notifPrefs       NotificationPreference?
 
   @@index([role])
   @@index([status])
@@ -715,4 +717,36 @@ model ProgressPhoto {
   createdAt DateTime @default(now())
 
   @@index([ownerId, takenAt])
+}
+
+// ---------------------------------------------------------------------------
+// PWA push (P11)
+// ---------------------------------------------------------------------------
+
+model PushSubscription {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint     String   @unique
+  p256dh       String
+  auth         String
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  lastSuccessAt DateTime?
+  failureCount Int      @default(0)
+
+  @@index([userId])
+}
+
+model NotificationPreference {
+  userId           String  @id
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  streakAtRisk     Boolean @default(true)
+  restTimerDone    Boolean @default(true)
+  friendActivity   Boolean @default(true)
+  friendStreakRisk Boolean @default(true)
+  workoutReminder  Boolean @default(true)
+  leagueResults    Boolean @default(true)
+  quietHoursStart  Int? // 0-23 local hour
+  quietHoursEnd    Int?
 }

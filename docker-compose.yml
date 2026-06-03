@@ -70,7 +70,7 @@ services:
         apk add --no-cache curl >/dev/null 2>&1
         echo "[cron] started"
         while true; do
-          for job in streak.rollover league.settle leaderboard.refresh; do
+          for job in streak.rollover streak.risk.notify league.settle leaderboard.refresh; do
             curl -s -m 30 -X POST -H "x-job-secret: $$JOB_SECRET" "http://app:3000/api/internal/jobs/$$job" >/dev/null 2>&1 || true
           done
           sleep 3600

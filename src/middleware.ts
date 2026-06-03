@@ -40,6 +40,8 @@ export function middleware(req: NextRequest) {
     `img-src 'self' data: blob:`,
     `font-src 'self' data:`,
     `connect-src 'self'`,
+    `worker-src 'self'`,
+    `manifest-src 'self'`,
     `frame-ancestors 'none'`,
     `object-src 'none'`,
     `base-uri 'self'`,

@@ -10,6 +10,7 @@ import {
 import { headers } from 'next/headers';
 import './globals.css';
 import { ThemeProvider, themeBootScript } from '@/components/theme/ThemeProvider';
+import { PwaRegister } from '@/components/pwa/PwaRegister';
 
 const manrope = Manrope({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'], variable: '--font-manrope', display: 'swap' });
 const hanken = Hanken_Grotesk({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'], variable: '--font-hanken', display: 'swap' });
@@ -45,6 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <ThemeProvider>{children}</ThemeProvider>
+        <PwaRegister />
       </body>
     </html>
   );

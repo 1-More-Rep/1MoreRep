@@ -3,8 +3,9 @@ import { prisma } from '@/server/db/prisma';
 import { weekKey } from '@/domain/gamification/xp';
 import { settleLeagues } from './leagueSettle';
 import { streakRollover } from './streakRollover';
+import { streakRiskNotify } from './streakRiskNotify';
 
-export const JOB_NAMES = ['streak.rollover', 'league.settle', 'leaderboard.refresh'] as const;
+export const JOB_NAMES = ['streak.rollover', 'league.settle', 'leaderboard.refresh', 'streak.risk.notify'] as const;
 export type JobName = (typeof JOB_NAMES)[number];
 
 /** Settle any past (already-ended) league weeks that are still ACTIVE. */
@@ -30,6 +31,8 @@ export async function runJob(name: string, now: Date = new Date()): Promise<unkn
     case 'leaderboard.refresh':
       // Leaderboards are computed live from UserStats (P9); nothing to materialize yet.
       return { ok: true };
+    case 'streak.risk.notify':
+      return streakRiskNotify(now);
     default:
       throw new Error(`unknown job: ${name}`);
   }
