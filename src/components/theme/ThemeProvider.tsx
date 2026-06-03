@@ -87,13 +87,28 @@ export const themeBootScript = `
     var raw = localStorage.getItem('${THEME_STORAGE_KEY}');
     if(!raw) return;
     var t = JSON.parse(raw);
-    var r = document.documentElement;
+    var r = document.documentElement, s = r.style;
     if (t && typeof t.dark === 'boolean') r.setAttribute('data-theme', t.dark ? 'dark' : 'light');
     if (t && t.iconStyle) r.setAttribute('data-icon-style', t.iconStyle);
     if (t && t.accent) {
-      r.style.setProperty('--accent', t.accent);
-      r.style.setProperty('--accent-text', t.dark ? 'color-mix(in oklab, '+t.accent+' 78%, white)' : t.accent);
+      s.setProperty('--accent', t.accent);
+      // light-mode accent-text must match buildVars (color-mix 58% #000), not raw accent.
+      s.setProperty('--accent-text', t.dark ? 'color-mix(in oklab, '+t.accent+' 78%, white)' : 'color-mix(in oklab, '+t.accent+' 58%, #000)');
     }
+    if (t && typeof t.radius === 'number') {
+      var rad = Math.round(t.radius);
+      s.setProperty('--r', rad+'px');
+      s.setProperty('--r-lg', (rad+6)+'px');
+      s.setProperty('--r-sm', Math.max(4, rad-6)+'px');
+      s.setProperty('--r-xs', Math.max(3, Math.round(rad/2.2))+'px');
+    }
+    var DENS = { compact:{pad:14,gap:10,screen:18,row:11}, regular:{pad:18,gap:14,screen:22,row:14}, comfy:{pad:24,gap:18,screen:28,row:18} };
+    var d = DENS[(t && t.density)] || DENS.regular;
+    s.setProperty('--pad', d.pad+'px'); s.setProperty('--gap', d.gap+'px'); s.setProperty('--screen-pad', d.screen+'px'); s.setProperty('--row', d.row+'px');
+    var FONTS = { calm:['var(--font-hanken)','var(--font-jetbrains-mono)'], techy:['var(--font-space-grotesk)','var(--font-space-mono)'], friendly:['var(--font-manrope)','var(--font-ibm-plex-mono)'] };
+    var f = FONTS[(t && t.font)] || FONTS.friendly;
+    s.setProperty('--font-sans', f[0]+", ui-sans-serif, system-ui, sans-serif");
+    s.setProperty('--font-mono', f[1]+", ui-monospace, 'SF Mono', monospace");
   } catch(e){}
 })();
 `;

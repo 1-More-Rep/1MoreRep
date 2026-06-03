@@ -4,11 +4,14 @@
 # "migrate deploy on boot"). Migrations are forward-only and safe to re-run.
 set -e
 
+# prisma + tsx resolve from the tools layer on PATH (/opt/tools/node_modules/.bin);
+# the generated @prisma/client + engine live in /app/node_modules. No pnpm needed
+# in the slim runner.
 echo "[entrypoint] Applying database migrations (prisma migrate deploy)..."
-pnpm exec prisma migrate deploy
+prisma migrate deploy
 
 echo "[entrypoint] Seeding (idempotent)..."
-pnpm exec tsx prisma/seed/index.ts
+tsx prisma/seed/index.ts
 
 echo "[entrypoint] Starting: $*"
 exec "$@"

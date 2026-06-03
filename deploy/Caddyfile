@@ -1,0 +1,12 @@
+# 1MoreRep reverse proxy (Caddy).
+# Enabled via the `caddy` compose profile when APP_URL is a public https domain.
+# Caddy provisions + renews TLS automatically (Let's Encrypt) for {$CADDY_DOMAIN}
+# and proxies everything to the app container on :3000.
+#
+# CADDY_DOMAIN is derived from APP_URL by install.sh (host part, no scheme).
+# For local/no-domain setups, don't enable this profile — run the app directly.
+
+{$CADDY_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}

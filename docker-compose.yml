@@ -1,6 +1,9 @@
 # 1MoreRep — self-hosted stack.
-# P0: app + postgres. Later phases add a cron sidecar (P8) and optional
-# `caddy` (HTTPS) and `ollama` (LLM) profiles.
+# Default `docker compose up` starts: db + app + cron (supercronic sidecar).
+# Optional services are gated behind profiles and excluded by default:
+#   --profile caddy   → HTTPS reverse proxy (auto-TLS) in front of the app
+#   --profile ollama  → local LLM server reachable at http://ollama:11434
+# install.sh sets COMPOSE_PROFILES=caddy automatically for a public https APP_URL.
 
 services:
   db:
@@ -54,28 +57,61 @@ services:
       retries: 12
       start_period: 60s
 
-  # Scheduled-job runner: hits the internal job endpoints hourly. Lightweight
-  # loop (no cron daemon needed); jobs self-gate on time/idempotency.
+  # Scheduled-job runner: supercronic (a crond that runs a committed crontab).
+  # curl is baked into the image (no boot-time `apk add`); each crontab line POSTs
+  # to the internal jobs endpoint. Cadences live in deploy/crontab. Jobs self-gate
+  # on time/idempotency, so missed/overlapping ticks are safe.
   cron:
-    image: alpine:3
+    build:
+      context: .
+      dockerfile: deploy/cron.Dockerfile
     restart: unless-stopped
     depends_on:
       app:
         condition: service_healthy
     environment:
       JOB_SECRET: ${JOB_SECRET:-}
-    entrypoint: ['/bin/sh', '-c']
-    command:
-      - |
-        apk add --no-cache curl >/dev/null 2>&1
-        echo "[cron] started"
-        while true; do
-          for job in streak.rollover streak.risk.notify league.settle leaderboard.refresh; do
-            curl -s -m 30 -X POST -H "x-job-secret: $$JOB_SECRET" "http://app:3000/api/internal/jobs/$$job" >/dev/null 2>&1 || true
-          done
-          sleep 3600
-        done
+    volumes:
+      - ./deploy/crontab:/etc/crontab:ro
+
+  # --- Optional: HTTPS reverse proxy (profile: caddy) ---------------------------
+  # Terminates TLS for the public domain and proxies to the app. Enable by setting
+  # COMPOSE_PROFILES=caddy (install.sh does this automatically for https APP_URLs).
+  # If you bring your own proxy, leave this disabled and set TRUST_PROXY=true.
+  caddy:
+    image: caddy:2-alpine
+    profiles: [caddy]
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      # Host part of APP_URL (no scheme); set by install.sh. Caddy auto-provisions
+      # a Let's Encrypt cert for this domain and serves HTTP/HTTPS on 80/443.
+      CADDY_DOMAIN: ${CADDY_DOMAIN:-}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - '80:80'
+      - '443:443'
+
+  # --- Optional: local LLM (profile: ollama) ------------------------------------
+  # Self-hosted model server. The app reaches it at http://ollama:11434, which
+  # matches the AppSettings.llmBaseUrl default. Enable with COMPOSE_PROFILES=ollama
+  # (or `docker compose --profile ollama up`). Pull a model once it's running:
+  #   docker compose exec ollama ollama pull llama3.2
+  ollama:
+    image: ollama/ollama
+    profiles: [ollama]
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
 
 volumes:
   db_data:
   uploads:
+  caddy_data:
+  caddy_config:
+  ollama_models:

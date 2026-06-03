@@ -1,0 +1,15 @@
+# 1MoreRep scheduled jobs — run by supercronic in the `cron` sidecar.
+# Each line POSTs to the internal jobs endpoint (shared-secret auth via JOB_SECRET,
+# injected into the container env). Jobs self-gate on time/idempotency, so an
+# extra or missed tick is harmless. Times are UTC (the container's clock).
+#
+# Standard 5-field cron: minute hour day-of-month month day-of-week
+#
+# leaderboard.refresh — keep ranking boards fresh
+*/10 * * * *  curl -fsS -m 30 -X POST -H "x-job-secret: $JOB_SECRET" http://app:3000/api/internal/jobs/leaderboard.refresh >/dev/null 2>&1
+# streak.rollover — advance/expire streaks
+0 * * * *     curl -fsS -m 30 -X POST -H "x-job-secret: $JOB_SECRET" http://app:3000/api/internal/jobs/streak.rollover >/dev/null 2>&1
+# streak.risk.notify — warn users whose streak is about to lapse
+0 * * * *     curl -fsS -m 30 -X POST -H "x-job-secret: $JOB_SECRET" http://app:3000/api/internal/jobs/streak.risk.notify >/dev/null 2>&1
+# league.settle — settle finished league weeks (self-no-ops mid-week)
+0 * * * *     curl -fsS -m 30 -X POST -H "x-job-secret: $JOB_SECRET" http://app:3000/api/internal/jobs/league.settle >/dev/null 2>&1

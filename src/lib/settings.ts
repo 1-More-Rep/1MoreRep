@@ -1,15 +1,48 @@
 import 'server-only';
-import type { InstanceSettings, Prisma } from '@prisma/client';
+import type { InstanceSettings } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { decryptSecret, encryptSecret } from './crypto';
 
+// In-memory defaults mirroring the InstanceSettings schema defaults. Used only as a
+// build-time / DB-unreachable fallback so metadata/manifest prerender never crashes.
+const DEFAULT_SETTINGS: InstanceSettings = {
+  id: 1,
+  brandName: '1MoreRep',
+  brandLogoKey: null,
+  themeColor: '#e2553a',
+  defaultUnitSystem: 'METRIC',
+  allowSelfRegistration: false,
+  requireEmailVerification: true,
+  smtpHost: null,
+  smtpPort: null,
+  smtpUser: null,
+  smtpPasswordEnc: null,
+  smtpFrom: null,
+  smtpSecure: true,
+  llmProvider: 'NONE',
+  llmBaseUrl: 'http://ollama:11434',
+  llmModel: 'llama3.1',
+  llmApiKeyEnc: null,
+  llmTimeoutMs: 20000,
+  vapidPublicKey: null,
+  vapidPrivateKeyEnc: null,
+  vapidSubject: null,
+  updatedAt: new Date(0),
+  updatedById: null,
+};
+
 /** Fetch the singleton instance settings (creating defaults on first access). */
 export async function getSettings(): Promise<InstanceSettings> {
-  return prisma.instanceSettings.upsert({
-    where: { id: 1 },
-    update: {},
-    create: { id: 1 },
-  });
+  try {
+    return await prisma.instanceSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
+  } catch (e) {
+    // No DB during `next build` prerender (or a transient outage): return safe
+    // defaults so brand/manifest/metadata rendering never crashes. Real settings
+    // load once the database is reachable.
+    if (e instanceof Prisma.PrismaClientInitializationError) return DEFAULT_SETTINGS;
+    throw e;
+  }
 }
 
 export async function updateSettings(

@@ -65,6 +65,7 @@ model User {
   defaultEquipment    Equipment[]      @default([])
   primaryGoal         Goal?
   onboardedAt         DateTime? // null until the onboarding wizard is completed
+  appearance          Json? // account-bound theme tweaks (accent/dark/font/radius/density)
 
   // Public profile surface (leaderboards) — explicit, opt-in.
   isProfilePublic Boolean @default(false)

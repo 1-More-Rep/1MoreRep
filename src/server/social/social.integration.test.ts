@@ -94,3 +94,41 @@ d('social', () => {
     expect(membership?.weeklyXp).toBeGreaterThanOrEqual(10);
   });
 });
+
+d('friend streak window + milestones (W6-T6)', () => {
+  let u: string;
+  let f: string;
+  const tag = Date.now();
+  const pairKey = () => {
+    const [x, y] = u < f ? [u, f] : [f, u];
+    return { userAId_userBId: { userAId: x, userBId: y } };
+  };
+
+  beforeAll(async () => {
+    u = (await prisma.user.create({ data: { email: `fsw-u-${tag}@test.local`, displayName: 'FSW U', status: 'ACTIVE' } })).id;
+    f = (await prisma.user.create({ data: { email: `fsw-f-${tag}@test.local`, displayName: 'FSW F', status: 'ACTIVE' } })).id;
+    await prisma.friendship.create({ data: { requesterId: u, addresseeId: f, status: 'ACCEPTED', respondedAt: new Date() } });
+  });
+  afterAll(async () => {
+    await prisma.user.deleteMany({ where: { id: { in: [u, f] } } });
+  });
+
+  it('does not advance when the friend trained outside the 36h window', async () => {
+    const now = new Date('2026-06-10T12:00:00Z');
+    await prisma.workoutSession.create({ data: { ownerId: f, status: 'COMPLETED', completedAt: new Date(now.getTime() - 40 * 3600_000) } });
+    await evaluateFriendStreaks(u, '2026-06-10', now);
+    expect(await prisma.friendStreak.findUnique({ where: pairKey() })).toBeNull();
+  });
+
+  it('writes a FRIEND_STREAK activity at a milestone (count 7)', async () => {
+    const now = new Date('2026-06-11T12:00:00Z');
+    const [x, y] = u < f ? [u, f] : [f, u];
+    await prisma.friendStreak.upsert({ where: pairKey(), update: { count: 6, lastDayKey: '2026-06-10', active: true }, create: { userAId: x, userBId: y, count: 6, lastDayKey: '2026-06-10', active: true } });
+    await prisma.workoutSession.create({ data: { ownerId: f, status: 'COMPLETED', completedAt: now } });
+    await evaluateFriendStreaks(u, '2026-06-11', now);
+    expect((await prisma.friendStreak.findUnique({ where: pairKey() }))?.count).toBe(7);
+    const act = await prisma.activityEvent.findFirst({ where: { userId: u, type: 'FRIEND_STREAK' } });
+    expect(act).toBeTruthy();
+    expect((act!.meta as { count?: number }).count).toBe(7);
+  });
+});

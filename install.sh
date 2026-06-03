@@ -62,12 +62,26 @@ else
   ')"
   get() { printf '%s' "$SECRETS_JSON" | sed -n "s/.*\"$1\":\"\([^\"]*\)\".*/\1/p"; }
 
+  # A public https URL gets the bundled Caddy reverse proxy (auto-TLS) via the
+  # `caddy` compose profile; http/localhost stays bring-your-own-proxy.
+  CADDY_DOMAIN=""
+  COMPOSE_PROFILES=""
+  case "$APP_URL_ARG" in
+    https://*)
+      CADDY_DOMAIN="${APP_URL_ARG#https://}"; CADDY_DOMAIN="${CADDY_DOMAIN%%/*}"
+      COMPOSE_PROFILES="caddy"
+      log "Public https URL — enabling the Caddy HTTPS proxy (domain: ${CADDY_DOMAIN})."
+      ;;
+  esac
+
   umask 077
   cat > .env <<EOF
 NODE_ENV=production
 APP_URL=${APP_URL_ARG}
 APP_PORT=${APP_PORT}
 TRUST_PROXY=true
+COMPOSE_PROFILES=${COMPOSE_PROFILES}
+CADDY_DOMAIN=${CADDY_DOMAIN}
 
 POSTGRES_USER=onemorerep
 POSTGRES_PASSWORD=$(get POSTGRES_PASSWORD)

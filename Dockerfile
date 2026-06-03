@@ -1,8 +1,13 @@
 # 1MoreRep runtime image.
-# P0: correctness-first (full deps in the runner so prisma CLI + tsx are available
-# for migrate/seed-on-boot). A slimmer standalone runner is a P12 hardening task.
-
-FROM node:22-slim AS base
+# Slim, standalone runner: ships only runtime artifacts (.next/standalone, static,
+# public, prisma) — no app source, no devDeps (eslint/vitest/playwright). The boot
+# entrypoint still runs `prisma migrate deploy` + the tsx seed; those CLIs live in
+# a tiny tools layer so they're available without shipping the whole build tree.
+#
+# Base pinned by digest (node:22-slim, the multi-arch index digest from Docker Hub)
+# for reproducible, supply-chain-safe builds. Re-resolve with:
+#   docker manifest inspect node:22-slim | grep digest   (use the index/list digest)
+FROM node:22-slim@sha256:7af03b14a13c8cdd38e45058fd957bf00a72bbe17feac43b1c15a689c029c732 AS base
 ENV PNPM_HOME=/pnpm \
     PATH=/pnpm:$PATH \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0
@@ -22,13 +27,52 @@ RUN pnpm install --frozen-lockfile || pnpm install
 COPY . .
 RUN pnpm prisma generate && pnpm build
 
+# ---- tools stage ----
+# A self-contained node_modules holding ONLY the CLIs the entrypoint needs
+# (prisma + tsx) and their deps — installed in isolation so it carries its own
+# bin (.bin/prisma, .bin/tsx) and never drags app/dev packages into the runner.
+# Versions are read from the app's package.json so the two stay in lockstep.
+# node-linker=hoisted keeps node_modules flat + relocatable (no pnpm store symlinks),
+# which is what lets us COPY the whole tree into the runner verbatim.
+FROM base AS tools
+WORKDIR /tools
+COPY package.json /app/package.json
+RUN node -e "const d=require('/app/package.json').dependencies; require('fs').writeFileSync('package.json', JSON.stringify({name:'tools',private:true,dependencies:{prisma:d.prisma,tsx:d.tsx}},null,2))" \
+  && pnpm install --prod --node-linker=hoisted --no-frozen-lockfile
+
 # ---- runtime stage ----
-FROM base AS runner
+FROM node:22-slim@sha256:7af03b14a13c8cdd38e45058fd957bf00a72bbe17feac43b1c15a689c029c732 AS runner
 ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
-    NEXT_TELEMETRY_DISABLED=1
-COPY --from=build /app ./
+    NEXT_TELEMETRY_DISABLED=1 \
+    # Entrypoint resolves `prisma` and `tsx` from the tools layer's bin dir.
+    PATH=/opt/tools/node_modules/.bin:$PATH
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+
+# Runtime artifacts only.
+# .next/standalone bundles server.js + the traced runtime node_modules (incl. the
+# generated @prisma/client). static + public are served by it; prisma/ holds the
+# schema, migrations and seed used on boot.
+COPY --from=build /app/.next/standalone ./
+COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
+COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/docker-entrypoint.sh ./docker-entrypoint.sh
+
+# Belt-and-braces: ensure the generated Prisma client + query engine are present
+# even if Next's file tracer missed the native engine (a known standalone gotcha).
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build /app/node_modules/@prisma/client ./node_modules/@prisma/client
+
+# CLI tools for the entrypoint (prisma migrate deploy + tsx seed), kept separate
+# from the app's traced node_modules so neither clobbers the other.
+COPY --from=tools /tools/node_modules /opt/tools/node_modules
+
 RUN groupadd -g 1001 nodejs \
   && useradd -u 1001 -g nodejs -m nextjs \
   && chmod +x /app/docker-entrypoint.sh \
@@ -36,4 +80,5 @@ RUN groupadd -g 1001 nodejs \
 USER nextjs
 EXPOSE 3000
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
-CMD ["pnpm", "start"]
+# Standalone server (replaces `next start`, which isn't available in the slim image).
+CMD ["node", "server.js"]

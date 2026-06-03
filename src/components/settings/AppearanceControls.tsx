@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
+import { saveAppearanceAction } from '@/server/actions/appearance';
 import { ACCENTS, ACCENT_NAMES, DENSITY, FONTS, type Density, type FontPairing } from '@/lib/theme/tokens';
 import { Btn, Card, Mono, SectionLabel } from '@/components/ui';
 
@@ -17,6 +19,20 @@ const selectStyle: React.CSSProperties = {
 
 export function AppearanceControls() {
   const { tweaks, setTweak, reset } = useTheme();
+  const firstRun = useRef(true);
+
+  // Persist tweaks to the account (debounced) so they follow the user across devices.
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    const t = setTimeout(() => {
+      void saveAppearanceAction({ ...tweaks } as Record<string, unknown>).catch(() => {});
+    }, 600);
+    return () => clearTimeout(t);
+  }, [tweaks]);
+
   return (
     <Card style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div>
