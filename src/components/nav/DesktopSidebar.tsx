@@ -52,7 +52,7 @@ export function DesktopSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
         <span style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-.02em' }}>1MoreRep</span>
       </Link>
 
-      <Btn kind="primary" icon="plus" full>
+      <Btn kind="primary" icon="plus" full href="/app/workout/new">
         New workout
       </Btn>
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useTheme } from '@/components/theme/ThemeProvider';
-import { ACCENTS, ACCENT_NAMES, DENSITY, FONTS, type Density, type FontPairing, type IconStyle } from '@/lib/theme/tokens';
+import { ACCENTS, ACCENT_NAMES, DENSITY, FONTS, type Density, type FontPairing } from '@/lib/theme/tokens';
 import { Btn, Card, Chip, Divider, Icon, IconTile, ICON_NAMES, Mono, Ring, SectionLabel, WeekBars } from '@/components/ui';
 
 const WEEK = [
@@ -72,12 +72,6 @@ export default function DesignSystemPage() {
           <select aria-label="Density" value={tweaks.density} onChange={(e) => setTweak('density', e.target.value as Density)} style={selectStyle}>
             {(Object.keys(DENSITY) as Density[]).map((d) => (
               <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
-
-          <select aria-label="Icon style" value={tweaks.iconStyle} onChange={(e) => setTweak('iconStyle', e.target.value as IconStyle)} style={selectStyle}>
-            {(['line', 'soft', 'solid'] as IconStyle[]).map((s) => (
-              <option key={s} value={s}>{s}</option>
             ))}
           </select>
 

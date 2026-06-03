@@ -16,7 +16,7 @@ const KIND_LABEL: Record<string, string> = {
 export default async function PrsPage() {
   const user = await requireUser();
   const prs = await prisma.personalRecord.findMany({
-    where: { ownerId: user.id, kind: { in: ['EST_1RM', 'BEST_WEIGHT'] } },
+    where: { ownerId: user.id },
     include: { exercise: { select: { name: true } } },
     orderBy: { achievedAt: 'desc' },
     take: 100,

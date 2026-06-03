@@ -1,8 +1,14 @@
 'use client';
 
-import { useActionState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
-import { addFriendAction, respondFriendAction, removeFriendAction, type SocialState } from '@/server/actions/social';
+import {
+  respondFriendAction,
+  removeFriendAction,
+  searchUsersAction,
+  sendRequestByHandleAction,
+  blockUserActionResult,
+} from '@/server/actions/social';
 import { Card } from '@/components/ui/Card';
 import { Btn } from '@/components/ui/Btn';
 import { Chip } from '@/components/ui/Chip';
@@ -16,29 +22,97 @@ export interface FriendLite {
   streak?: number;
 }
 
+interface SearchHit {
+  id: string;
+  displayName: string;
+  publicHandle: string | null;
+}
+
 export function FriendsManager({ friends, requests }: { friends: FriendLite[]; requests: FriendLite[] }) {
-  const [state, action] = useActionState(addFriendAction, {} as SocialState);
   const [, start] = useTransition();
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<SearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [msg, setMsg] = useState<{ error?: string; notice?: string }>({});
+  const seq = useRef(0);
+
+  // Debounced live lookup (≥2 chars). The latest query wins (seq guard).
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const mine = ++seq.current;
+    const t = setTimeout(async () => {
+      try {
+        const hits = await searchUsersAction(q);
+        if (mine === seq.current) setResults(hits.map((h) => ({ id: h.id, displayName: h.displayName, publicHandle: h.publicHandle })));
+      } finally {
+        if (mine === seq.current) setSearching(false);
+      }
+    }, 250);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  function add(handle: string | null) {
+    if (!handle) return;
+    start(async () => {
+      const r = await sendRequestByHandleAction(handle);
+      setMsg(r);
+      if (r.notice) {
+        setQuery('');
+        setResults([]);
+      }
+    });
+  }
+
+  function block(id: string, name: string) {
+    if (!window.confirm(`Block ${name}? They will be removed as a friend and hidden from search.`)) return;
+    start(async () => {
+      const r = await blockUserActionResult(id);
+      setMsg(r);
+    });
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
       <Card>
         <SectionLabel style={{ marginBottom: 12 }}>Add a friend</SectionLabel>
-        <form action={action} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ flex: '1 1 200px' }}>
-            <Alert kind="error">{state.error}</Alert>
-            <Alert kind="notice">{state.notice}</Alert>
-            <TextField label="Handle" name="handle" placeholder="their @handle" />
+        <Alert kind="error">{msg.error}</Alert>
+        <Alert kind="notice">{msg.notice}</Alert>
+        <TextField
+          label="Search by @handle"
+          name="handle"
+          placeholder="start typing a handle…"
+          value={query}
+          onChange={(e) => setQuery(e.currentTarget.value)}
+          autoComplete="off"
+        />
+        {query.trim().length >= 2 && (
+          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {searching && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Searching…</span>}
+            {!searching && results.length === 0 && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>No matching users.</span>}
+            {results.map((u) => (
+              <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 'var(--r-sm)', background: 'var(--surface-2)' }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{u.displayName}</div>
+                  {u.publicHandle && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>@{u.publicHandle}</div>}
+                </div>
+                <Btn kind="primary" size="sm" icon="plus" onClick={() => add(u.publicHandle)}>Add</Btn>
+              </div>
+            ))}
           </div>
-          <Btn type="submit" icon="plus">Send request</Btn>
-        </form>
+        )}
       </Card>
 
       {requests.length > 0 && (
         <Card pad={false}>
           <div style={{ padding: 'var(--pad) var(--pad) 0' }}><SectionLabel>Requests</SectionLabel></div>
           {requests.map((r, i) => (
-            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 'var(--row) var(--pad)', borderTop: i ? '1px solid var(--line)' : '1px solid var(--line)', marginTop: i ? 0 : 10 }}>
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 'var(--row) var(--pad)', borderTop: '1px solid var(--line)', marginTop: i ? 0 : 10 }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14.5, fontWeight: 600 }}>{r.displayName}</div>
                 {r.publicHandle && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>@{r.publicHandle}</div>}
@@ -62,6 +136,7 @@ export function FriendsManager({ friends, requests }: { friends: FriendLite[]; r
             <Chip accent><Icon name="flame" size={13} stroke={2} /><Mono>{f.streak}</Mono></Chip>
           ) : null}
           <Btn kind="ghost" size="sm" onClick={() => start(() => removeFriendAction(f.id))}>Remove</Btn>
+          <Btn kind="ghost" size="sm" onClick={() => block(f.id, f.displayName)} style={{ color: 'var(--text-3)' }}>Block</Btn>
         </Card>
       ))}
     </div>

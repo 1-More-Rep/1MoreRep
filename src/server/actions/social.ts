@@ -34,24 +34,41 @@ export async function removeFriendAction(otherId: string): Promise<void> {
   revalidatePath('/app/social/friends');
 }
 
-export async function blockUserAction(targetId: string): Promise<void> {
-  const user = await requireUser();
-  await blockUser(user.id, targetId);
-  revalidatePath('/app/social/friends');
-}
-
 export async function searchUsersAction(q: string) {
   const user = await requireUser();
   return searchUsersByHandle(q, user.id);
 }
 
+/** Send a friend request to an exact handle (used by the typeahead result click). */
+export async function sendRequestByHandleAction(handle: string): Promise<SocialState> {
+  const user = await requireUser();
+  const r = await sendFriendRequest(user.id, handle);
+  if (r.error) return { error: r.error };
+  revalidatePath('/app/social/friends');
+  return { notice: 'Friend request sent.' };
+}
+
+export async function blockUserActionResult(targetId: string): Promise<SocialState> {
+  const user = await requireUser();
+  await blockUser(user.id, targetId);
+  revalidatePath('/app/social/friends');
+  return { notice: 'User blocked.' };
+}
+
 export async function updatePrivacyAction(_prev: SocialState, formData: FormData): Promise<SocialState> {
   const user = await requireUser();
   await getPrivacy(user.id); // ensure row
+  const vis = (k: string): Visibility => {
+    const v = String(formData.get(k));
+    return v === 'PUBLIC' || v === 'FRIENDS' || v === 'PRIVATE' ? v : 'FRIENDS';
+  };
   await prisma.privacySettings.update({
     where: { userId: user.id },
     data: {
-      profileVisible: (String(formData.get('profileVisible')) as Visibility) || 'FRIENDS',
+      profileVisible: vis('profileVisible'),
+      showWorkouts: vis('showWorkouts'),
+      showStats: vis('showStats'),
+      showPhotos: vis('showPhotos'),
       leaderboardOptIn: formData.get('leaderboardOptIn') === 'on',
       activityFeedOptIn: formData.get('activityFeedOptIn') === 'on',
       searchableByHandle: formData.get('searchableByHandle') === 'on',

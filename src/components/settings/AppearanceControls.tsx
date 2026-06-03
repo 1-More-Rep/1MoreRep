@@ -1,7 +1,7 @@
 'use client';
 
 import { useTheme } from '@/components/theme/ThemeProvider';
-import { ACCENTS, ACCENT_NAMES, DENSITY, FONTS, type Density, type FontPairing, type IconStyle } from '@/lib/theme/tokens';
+import { ACCENTS, ACCENT_NAMES, DENSITY, FONTS, type Density, type FontPairing } from '@/lib/theme/tokens';
 import { Btn, Card, Mono, SectionLabel } from '@/components/ui';
 
 const selectStyle: React.CSSProperties = {
@@ -55,14 +55,6 @@ export function AppearanceControls() {
           <select aria-label="Density" value={tweaks.density} onChange={(e) => setTweak('density', e.target.value as Density)} style={selectStyle}>
             {(Object.keys(DENSITY) as Density[]).map((dn) => (
               <option key={dn} value={dn}>{dn}</option>
-            ))}
-          </select>
-        </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <SectionLabel>Icons</SectionLabel>
-          <select aria-label="Icon style" value={tweaks.iconStyle} onChange={(e) => setTweak('iconStyle', e.target.value as IconStyle)} style={selectStyle}>
-            {(['line', 'soft', 'solid'] as IconStyle[]).map((s) => (
-              <option key={s} value={s}>{s}</option>
             ))}
           </select>
         </label>

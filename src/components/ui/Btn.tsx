@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react';
 import { Icon, type IconName } from './Icon';
 
@@ -13,6 +14,8 @@ export interface BtnProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
   icon?: IconName;
   full?: boolean;
   style?: CSSProperties;
+  /** When set, render as a navigation link (anchor) instead of a <button>. */
+  href?: string;
 }
 
 const SIZES: Record<Size, { h: number; px: number; fs: number; gap: number }> = {
@@ -40,38 +43,56 @@ export function Btn({
   full = false,
   style,
   disabled,
+  href,
   ...rest
 }: BtnProps) {
   const s = SIZES[size];
+  const baseStyle: CSSProperties = {
+    height: s.h,
+    padding: `0 ${s.px}px`,
+    gap: s.gap,
+    width: full ? '100%' : undefined,
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 'var(--r)',
+    fontFamily: 'var(--font-sans)',
+    fontSize: s.fs,
+    fontWeight: 600,
+    letterSpacing: '.005em',
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.55 : 1,
+    transition: 'transform .12s, filter .15s, background .15s',
+    textDecoration: 'none',
+    ...KINDS[kind],
+    ...style,
+  };
+  const inner = (
+    <>
+      {icon && <Icon name={icon} size={size === 'lg' ? 20 : 17} stroke={2} />}
+      {children}
+    </>
+  );
+
+  // Render as an anchor link when href is provided (valid HTML — no button-in-anchor).
+  if (href && !disabled) {
+    return (
+      <Link href={href} style={baseStyle}>
+        {inner}
+      </Link>
+    );
+  }
+
   return (
     <button
       disabled={disabled}
-      style={{
-        height: s.h,
-        padding: `0 ${s.px}px`,
-        gap: s.gap,
-        width: full ? '100%' : undefined,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 'var(--r)',
-        fontFamily: 'var(--font-sans)',
-        fontSize: s.fs,
-        fontWeight: 600,
-        letterSpacing: '.005em',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.55 : 1,
-        transition: 'transform .12s, filter .15s, background .15s',
-        ...KINDS[kind],
-        ...style,
-      }}
+      style={baseStyle}
       onMouseDown={(e) => !disabled && (e.currentTarget.style.transform = 'scale(.98)')}
       onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
       onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
       {...rest}
     >
-      {icon && <Icon name={icon} size={size === 'lg' ? 20 : 17} stroke={2} />}
-      {children}
+      {inner}
     </button>
   );
 }
