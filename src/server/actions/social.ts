@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/guards';
 import { sendFriendRequest, respondToRequest, removeFriend, blockUser, searchUsersByHandle } from '@/server/social/friends';
+import { generateInviteLink, acceptInvite } from '@/server/social/inviteLink';
 import { getPrivacy } from '@/server/social/privacy';
 import { prisma } from '@/server/db/prisma';
 import type { Visibility } from '@prisma/client';
@@ -53,6 +54,22 @@ export async function blockUserActionResult(targetId: string): Promise<SocialSta
   await blockUser(user.id, targetId);
   revalidatePath('/app/social/friends');
   return { notice: 'User blocked.' };
+}
+
+/** Mint a shareable invite link and return its app-relative join URL. */
+export async function generateInviteLinkAction(): Promise<{ url: string }> {
+  const user = await requireUser();
+  const code = await generateInviteLink(user.id);
+  return { url: `/app/social/join/${code}` };
+}
+
+/** Accept a shared invite link, becoming friends with its creator. */
+export async function acceptInviteAction(code: string): Promise<SocialState> {
+  const user = await requireUser();
+  const r = await acceptInvite(code, user.id);
+  if (r.error) return { error: r.error };
+  revalidatePath('/app/social/friends');
+  return { notice: 'You are now friends!' };
 }
 
 export async function updatePrivacyAction(_prev: SocialState, formData: FormData): Promise<SocialState> {

@@ -9,6 +9,7 @@ const LINKS = [
   { href: '/app/social/league', icon: 'trophy' as const, title: 'League', desc: 'Your weekly division and standings' },
   { href: '/app/social/leaderboard', icon: 'chart' as const, title: 'Leaderboards', desc: 'Instance-wide XP, streak and volume' },
   { href: '/app/social/friends', icon: 'user' as const, title: 'Friends', desc: 'Add friends and compare progress' },
+  { href: '/app/social/compare', icon: 'target' as const, title: 'Compare', desc: 'Stack your stats next to a friend' },
   { href: '/app/social/feed', icon: 'flame' as const, title: 'Friend activity', desc: 'PRs, streaks and milestones' },
 ];
 

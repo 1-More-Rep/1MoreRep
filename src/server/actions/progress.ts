@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/guards';
 import { savePhoto, deletePhoto } from '@/server/services/photoService';
-import { addBodyMetric, deleteBodyMetric } from '@/server/services/bodyMetricService';
+import { addBodyMetric, updateBodyMetric, deleteBodyMetric } from '@/server/services/bodyMetricService';
 import type { Prisma } from '@prisma/client';
 
 export interface ProgressState {
@@ -41,6 +41,27 @@ export async function addBodyMetricAction(_prev: ProgressState, formData: FormDa
   await addBodyMetric(user.id, { bodyweightKg: bw && !Number.isNaN(bw) ? bw : null, measurements: Object.keys(measurements).length ? (measurements as Prisma.InputJsonValue) : undefined });
   revalidatePath('/app/progress');
   return { notice: 'Logged.' };
+}
+
+export async function updateBodyMetricAction(_prev: ProgressState, formData: FormData): Promise<ProgressState> {
+  const user = await requireUser();
+  const id = String(formData.get('id') || '');
+  if (!id) return { error: 'Missing entry.' };
+  const bodyweight = formData.get('bodyweightKg');
+  const bw = bodyweight ? Number(bodyweight) : null;
+  const measurements: Record<string, number> = {};
+  for (const key of ['waist', 'chest', 'arms', 'thighs', 'hips']) {
+    const v = formData.get(key);
+    if (v && !Number.isNaN(Number(v))) measurements[key] = Number(v);
+  }
+  if (bw == null && Object.keys(measurements).length === 0) return { error: 'Enter a bodyweight or a measurement.' };
+  const updated = await updateBodyMetric(id, user.id, {
+    bodyweightKg: bw && !Number.isNaN(bw) ? bw : null,
+    measurements: Object.keys(measurements).length ? (measurements as Prisma.InputJsonValue) : undefined,
+  });
+  if (!updated) return { error: 'Entry not found.' };
+  revalidatePath('/app/progress');
+  return { notice: 'Updated.' };
 }
 
 export async function deleteBodyMetricAction(id: string): Promise<void> {

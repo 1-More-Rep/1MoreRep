@@ -2,12 +2,21 @@
 
 import { useState, useTransition } from 'react';
 import type { Equipment } from '@prisma/client';
-import { generatePlanAction, startFromPlanAction, type GenerateResult } from '@/server/actions/generator';
+import {
+  generatePlanAction,
+  startFromPlanAction,
+  swapExerciseAction,
+  adjustDifficultyAction,
+  parseGoalAction,
+  type GenerateResult,
+  type GenInputs,
+} from '@/server/actions/generator';
 import type { GenGoal } from '@/domain/generator/types';
 import { MUSCLE_LABEL } from '@/domain/muscles/taxonomy';
 import { Card } from '@/components/ui/Card';
 import { Btn } from '@/components/ui/Btn';
 import { Chip } from '@/components/ui/Chip';
+import { Icon } from '@/components/ui/Icon';
 import { Mono, SectionLabel } from '@/components/ui/typography';
 
 const GOALS: { value: GenGoal; label: string }[] = [
@@ -19,28 +28,57 @@ const GOALS: { value: GenGoal; label: string }[] = [
 const TIMES = [30, 45, 60, 90];
 const EQUIP: Equipment[] = ['BARBELL', 'DUMBBELL', 'MACHINE', 'CABLE', 'BODYWEIGHT', 'KETTLEBELL', 'BAND'];
 
-export function GeneratorFlow() {
-  const [goal, setGoal] = useState<GenGoal>('HYPERTROPHY');
+export function GeneratorFlow({ initialGoal }: { initialGoal?: GenGoal }) {
+  const [goal, setGoal] = useState<GenGoal>(initialGoal ?? 'HYPERTROPHY');
   const [time, setTime] = useState(60);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [freeText, setFreeText] = useState('');
   const [result, setResult] = useState<GenerateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
+  const inputs = (): GenInputs => ({ goal, availableTimeMin: time, equipment });
+
   function toggleEquip(e: Equipment) {
     setEquipment((prev) => (prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e]));
+  }
+
+  function applyFreeText() {
+    if (!freeText.trim()) return;
+    start(async () => {
+      const parsed = await parseGoalAction(freeText);
+      setGoal(parsed.goal);
+      setTime(parsed.availableTimeMin <= 45 ? (parsed.availableTimeMin <= 30 ? 30 : 45) : parsed.availableTimeMin >= 90 ? 90 : 60);
+      setEquipment(parsed.equipment);
+    });
   }
 
   function generate() {
     setError(null);
     start(async () => {
       try {
-        const r = await generatePlanAction({ goal, availableTimeMin: time, equipment });
+        const r = await generatePlanAction(inputs());
         if (r.plan.exercises.length === 0) setError('No exercises matched. Try different equipment or more time.');
         setResult(r);
       } catch {
         setError('Could not generate a workout. Try again.');
       }
+    });
+  }
+
+  function swap(index: number) {
+    if (!result) return;
+    start(async () => {
+      const r = await swapExerciseAction(inputs(), result.plan, index);
+      setResult(r);
+    });
+  }
+
+  function adjust(direction: 'harder' | 'easier') {
+    if (!result) return;
+    start(async () => {
+      const r = await adjustDifficultyAction(result.plan, direction);
+      setResult(r);
     });
   }
 
@@ -54,19 +92,30 @@ export function GeneratorFlow() {
 
         <Card pad={false}>
           {result.plan.exercises.map((ex, i) => (
-            <div key={ex.exerciseId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 'var(--row) var(--pad)', borderTop: i ? '1px solid var(--line)' : 'none' }}>
+            <div key={`${ex.exerciseId}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 'var(--row) var(--pad)', borderTop: i ? '1px solid var(--line)' : 'none' }}>
               <Mono style={{ color: 'var(--text-3)', width: 18 }}>{i + 1}</Mono>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{ex.name}</div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{MUSCLE_LABEL[ex.primaryMuscle]}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
+                  {MUSCLE_LABEL[ex.primaryMuscle]}{ex.supersetGroup != null ? ' · superset' : ''}
+                </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <Mono style={{ fontSize: 14, fontWeight: 600, display: 'block' }}>{ex.sets} × {ex.repLow}–{ex.repHigh}</Mono>
                 {ex.loadSuggestionKg != null && <Mono style={{ fontSize: 11.5, color: 'var(--text-3)' }}>~{ex.loadSuggestionKg} kg</Mono>}
               </div>
+              <button onClick={() => swap(i)} disabled={pending} aria-label={`Swap ${ex.name}`} title="Swap exercise" style={{ background: 'none', border: '1px solid var(--line-2)', borderRadius: 'var(--r-sm)', height: 34, width: 34, color: 'var(--text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Icon name="repeat" size={15} />
+              </button>
             </div>
           ))}
         </Card>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <SectionLabel>Difficulty</SectionLabel>
+          <Btn kind="soft" size="sm" disabled={pending} onClick={() => adjust('easier')}>Easier</Btn>
+          <Btn kind="soft" size="sm" disabled={pending} onClick={() => adjust('harder')}>Harder</Btn>
+        </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
           <form action={startFromPlanAction.bind(null, result.plan, goal)} style={{ flex: 1 }}>
@@ -82,6 +131,22 @@ export function GeneratorFlow() {
   return (
     <Card style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {error && <Chip style={{ color: '#c0392b' }}>{error}</Chip>}
+
+      <div>
+        <SectionLabel style={{ marginBottom: 10 }}>Describe it (optional)</SectionLabel>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            value={freeText}
+            onChange={(e) => setFreeText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyFreeText(); } }}
+            placeholder="e.g. 45 min dumbbell hypertrophy"
+            aria-label="Describe your workout"
+            style={{ flex: 1, height: 42, padding: '0 12px', borderRadius: 'var(--r-sm)', border: '1px solid var(--line-2)', background: 'var(--surface)', color: 'var(--text)', fontSize: 14, fontFamily: 'var(--font-sans)' }}
+          />
+          <Btn kind="soft" size="sm" disabled={pending || !freeText.trim()} onClick={applyFreeText}>Fill</Btn>
+        </div>
+      </div>
+
       <div>
         <SectionLabel style={{ marginBottom: 10 }}>Goal</SectionLabel>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

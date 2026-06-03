@@ -2,6 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@/server/db/prisma';
 import { awardForWorkout, awardFriendStreakBonus } from './award';
 import { settleLeagues } from '@/server/jobs/leagueSettle';
+import { refreshLeaderboards } from '@/server/jobs/leaderboardRefresh';
+import { getBoard, buildBoard } from '@/server/queries/gamification';
 import { runJob } from '@/server/jobs';
 
 let dbReachable = false;
@@ -138,5 +140,54 @@ d('job dispatch', () => {
     await expect(runJob('leaderboard.refresh')).resolves.toBeTruthy();
     await expect(runJob('streak.rollover', new Date('2026-06-02T05:00:00Z'))).resolves.toBeTruthy();
     await expect(runJob('bogus')).rejects.toThrow(/unknown job/);
+  });
+
+  it('writes a JobRun row for wrapped jobs (observability)', async () => {
+    await runJob('leaderboard.refresh', new Date('2026-06-02T05:30:00Z'));
+    const run = await prisma.jobRun.findFirst({ where: { job: 'leaderboard.refresh' }, orderBy: { startedAt: 'desc' } });
+    expect(run?.status).toBe('OK');
+    expect(run?.finishedAt).not.toBeNull();
+  });
+});
+
+d('leaderboards (Soc-T2)', () => {
+  let ids: string[] = [];
+  // High XP values so our cohort dominates any leftover test data.
+  const vals = [5_000_000, 4_000_000, 3_000_000, 2_000_000, 1_000_000];
+
+  beforeAll(async () => {
+    const users = await Promise.all(vals.map((_, i) => makeUser(`lb${i}`)));
+    ids = users.map((u) => u.id);
+    await prisma.userStats.createMany({ data: ids.map((id, i) => ({ userId: id, lifetimeXp: vals[i]! })) });
+  });
+  afterAll(async () => {
+    await prisma.leaderboardSnapshot.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.user.deleteMany({ where: { id: { in: ids } } });
+  });
+
+  it('materialized snapshot ranking matches a fresh recompute', async () => {
+    await refreshLeaderboards(new Date('2026-06-02T12:00:00Z'));
+    const recompute = await buildBoard('ALLTIME_XP');
+    const snaps = await prisma.leaderboardSnapshot.findMany({ where: { board: 'ALLTIME_XP', weekKey: 'ALL' }, orderBy: { rank: 'asc' } });
+    expect(snaps[0]!.userId).toBe(recompute[0]!.userId);
+    // our 5 (highest in DB) lead the board in descending order
+    expect(snaps.slice(0, 5).map((s) => s.userId)).toEqual(ids);
+  });
+
+  it('pins an off-board viewer to their brute-force rank', async () => {
+    const lowId = ids[4]!; // 1,000,000 — our lowest
+    const { rows, self } = await getBoard('ALLTIME_XP', lowId, 2); // only top-2 shown
+    const full = await buildBoard('ALLTIME_XP');
+    const expectedRank = full.findIndex((f) => f.userId === lowId) + 1;
+    expect(rows.some((r) => r.isSelf)).toBe(false);
+    expect(self?.rank).toBe(expectedRank);
+  });
+
+  it('excludes opted-out users from the board', async () => {
+    const topId = ids[0]!;
+    await prisma.privacySettings.upsert({ where: { userId: topId }, update: { leaderboardOptIn: false }, create: { userId: topId, leaderboardOptIn: false } });
+    const board = await buildBoard('ALLTIME_XP');
+    expect(board.some((b) => b.userId === topId)).toBe(false);
+    await prisma.privacySettings.update({ where: { userId: topId }, data: { leaderboardOptIn: true } });
   });
 });

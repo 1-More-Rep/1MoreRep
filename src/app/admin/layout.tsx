@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getCurrentUser, hasRole } from '@/lib/auth/guards';
 import { Icon } from '@/components/ui/Icon';
+import { ImpersonationBanner } from '@/components/admin/ImpersonationBanner';
 
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: 'chart' as const },
@@ -18,6 +19,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg)' }}>
+      <ImpersonationBanner />
       <header
         style={{
           borderBottom: '1px solid var(--line)',

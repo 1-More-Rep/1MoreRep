@@ -3,7 +3,7 @@ import { prisma } from '@/server/db/prisma';
 import { sendFriendRequest, respondToRequest, areFriends, searchUsersByHandle, listFriends, blockUser } from './friends';
 import { canView } from './privacy';
 import { evaluateFriendStreaks } from './friendStreak';
-import { getLeaderboard } from '@/server/queries/gamification';
+import { buildBoard } from '@/server/queries/gamification';
 
 let dbReachable = false;
 try {
@@ -65,10 +65,11 @@ d('social', () => {
   });
 
   it('leaderboard honors opt-out', async () => {
+    // buildBoard is the live source of truth (snapshots are a materialized cache).
     await prisma.userStats.create({ data: { userId: c, lifetimeXp: 999999 } });
-    expect((await getLeaderboard('XP', a, 100)).some((r) => r.value === 999999)).toBe(true);
+    expect((await buildBoard('ALLTIME_XP')).some((r) => r.value === 999999)).toBe(true);
     await prisma.privacySettings.update({ where: { userId: c }, data: { leaderboardOptIn: false } });
-    expect((await getLeaderboard('XP', a, 100)).some((r) => r.value === 999999)).toBe(false);
+    expect((await buildBoard('ALLTIME_XP')).some((r) => r.value === 999999)).toBe(false);
   });
 
   it('friend streak increments when both friends trained recently', async () => {

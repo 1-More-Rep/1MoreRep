@@ -15,6 +15,8 @@ export interface SessionContext {
   ip?: string | null;
   userAgent?: string | null;
   label?: string | null;
+  /** When set, this session is an impersonation; value is the real admin's userId. */
+  impersonatorId?: string | null;
 }
 
 function cookieOptions(expires: Date) {
@@ -45,6 +47,7 @@ export async function createSession(userId: string, ctx: SessionContext = {}): P
       ipHash: ctx.ip ? hmacIp(ctx.ip) : null,
       userAgent: ctx.userAgent ?? null,
       label: ctx.label ?? null,
+      impersonatorId: ctx.impersonatorId ?? null,
     },
   });
 
@@ -55,6 +58,8 @@ export async function createSession(userId: string, ctx: SessionContext = {}): P
 export interface SessionUser {
   sessionId: string;
   user: User;
+  /** Set when the session is an impersonation; the real admin's userId. */
+  impersonatorId: string | null;
 }
 
 /** Validate the request's session cookie; returns the user or null. */
@@ -91,7 +96,7 @@ export async function validateSession(): Promise<SessionUser | null> {
       .catch(() => {});
   }
 
-  return { sessionId: id, user: session.user };
+  return { sessionId: id, user: session.user, impersonatorId: session.impersonatorId };
 }
 
 /** Delete the current session and clear the cookie. */

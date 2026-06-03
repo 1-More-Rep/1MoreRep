@@ -6,6 +6,7 @@ import { detectPushCapability, type PushCapability } from '@/lib/pwa/ios';
 import { Btn } from '@/components/ui/Btn';
 import { Chip } from '@/components/ui/Chip';
 import { SectionLabel } from '@/components/ui/typography';
+import { InstallGuide } from './InstallGuide';
 
 function urlBase64ToBuffer(base64: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
@@ -85,7 +86,7 @@ export function PushManager({ vapidPublicKey }: { vapidPublicKey: string | null 
       {!vapidPublicKey ? (
         <Chip>Push isn&apos;t configured on this instance yet.</Chip>
       ) : cap === 'needs-install' ? (
-        <Chip>On iPhone/iPad, add 1MoreRep to your Home Screen first, then enable notifications.</Chip>
+        <InstallGuide />
       ) : cap === 'unsupported' ? (
         <Chip>This browser doesn&apos;t support push notifications.</Chip>
       ) : (

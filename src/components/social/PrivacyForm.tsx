@@ -15,6 +15,19 @@ function Toggle({ name, label, defaultChecked }: { name: string; label: string; 
   );
 }
 
+function VisibilitySelect({ name, label, defaultValue }: { name: string; label: string; defaultValue: PrivacySettings['showStats'] }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{label}</span>
+      <select name={name} defaultValue={defaultValue} style={{ height: 46, padding: '0 12px', borderRadius: 'var(--r-sm)', border: '1px solid var(--line-2)', background: 'var(--surface)', color: 'var(--text)', fontSize: 14 }}>
+        <option value="PUBLIC">Public</option>
+        <option value="FRIENDS">Friends only</option>
+        <option value="PRIVATE">Private</option>
+      </select>
+    </label>
+  );
+}
+
 export function PrivacyForm({ p }: { p: PrivacySettings }) {
   const [state, action] = useActionState(updatePrivacyAction, {} as SocialState);
   return (
@@ -28,6 +41,9 @@ export function PrivacyForm({ p }: { p: PrivacySettings }) {
           <option value="PRIVATE">Private</option>
         </select>
       </label>
+      <VisibilitySelect name="showWorkouts" label="Who can see my workouts" defaultValue={p.showWorkouts} />
+      <VisibilitySelect name="showStats" label="Who can see my stats" defaultValue={p.showStats} />
+      <VisibilitySelect name="showPhotos" label="Who can see my progress photos" defaultValue={p.showPhotos} />
       <Toggle name="leaderboardOptIn" label="Show me on public leaderboards" defaultChecked={p.leaderboardOptIn} />
       <Toggle name="activityFeedOptIn" label="Share my activity with friends" defaultChecked={p.activityFeedOptIn} />
       <Toggle name="searchableByHandle" label="Let others find me by handle" defaultChecked={p.searchableByHandle} />

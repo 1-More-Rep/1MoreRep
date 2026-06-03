@@ -52,29 +52,80 @@ export async function getLeagueBoard(userId: string) {
   return { tier: membership.cohort.tier, weekKey: wk, rows, settlesAt: next };
 }
 
-export type LeaderboardKind = 'XP' | 'STREAK' | 'VOLUME';
+// Materialized + live leaderboards. WEEKLY_XP is keyed by ISO week; the rest are
+// all-time. Display reads materialized snapshots when present (job-built) and
+// always derives the viewer's true rank from a full recompute (brute-force).
+export type BoardKey = 'WEEKLY_XP' | 'ALLTIME_XP' | 'STREAK' | 'VOLUME' | 'PR';
 
-export async function getLeaderboard(kind: LeaderboardKind, userId: string, limit = 50) {
-  const orderBy =
-    kind === 'XP' ? { lifetimeXp: 'desc' as const } : kind === 'STREAK' ? { longestStreak: 'desc' as const } : { totalVolume: 'desc' as const };
-  const rows = await prisma.userStats.findMany({
-    where: {
-      user: {
-        status: 'ACTIVE',
-        // honor leaderboard opt-out (default: opted in)
-        OR: [{ privacy: { is: null } }, { privacy: { leaderboardOptIn: true } }],
-      },
-    },
-    include: { user: { select: { displayName: true, publicHandle: true } } },
-    orderBy,
+const OPTED_IN = { status: 'ACTIVE' as const, OR: [{ privacy: { is: null } }, { privacy: { leaderboardOptIn: true } }] };
+
+/** Full descending ranking over opted-in active users for a board. Source of truth. */
+export async function buildBoard(board: BoardKey, now: Date = new Date()): Promise<{ userId: string; value: number }[]> {
+  const users = await prisma.user.findMany({ where: OPTED_IN, select: { id: true } });
+  const ids = users.map((u) => u.id);
+  if (ids.length === 0) return [];
+
+  let pairs: { userId: string; value: number }[] = [];
+  if (board === 'ALLTIME_XP' || board === 'STREAK' || board === 'VOLUME') {
+    const stats = await prisma.userStats.findMany({ where: { userId: { in: ids } } });
+    pairs = stats.map((s) => ({
+      userId: s.userId,
+      value: board === 'ALLTIME_XP' ? s.lifetimeXp : board === 'STREAK' ? s.longestStreak : Number(s.totalVolume) / 100,
+    }));
+  } else if (board === 'WEEKLY_XP') {
+    const wk = weekKey(now, 'UTC');
+    const grouped = await prisma.xpEvent.groupBy({ by: ['userId'], where: { userId: { in: ids }, weekKey: wk }, _sum: { amount: true } });
+    pairs = grouped.map((g) => ({ userId: g.userId, value: g._sum.amount ?? 0 }));
+  } else {
+    // PR board — count of personal records held
+    const grouped = await prisma.personalRecord.groupBy({ by: ['ownerId'], where: { ownerId: { in: ids } }, _count: { _all: true } });
+    pairs = grouped.map((g) => ({ userId: g.ownerId, value: g._count._all }));
+  }
+  return pairs
+    .filter((p) => p.value > 0)
+    .sort((a, b) => (b.value - a.value) || a.userId.localeCompare(b.userId));
+}
+
+export interface BoardRowOut {
+  rank: number;
+  name: string;
+  value: number;
+  isSelf: boolean;
+}
+
+const snapWeekFor = (board: BoardKey, now: Date) => (board === 'WEEKLY_XP' ? weekKey(now, 'UTC') : 'ALL');
+
+export async function getBoard(board: BoardKey, userId: string, limit = 50, now: Date = new Date()): Promise<{ rows: BoardRowOut[]; self: { rank: number; value: number } | null }> {
+  const snaps = await prisma.leaderboardSnapshot.findMany({
+    where: { board, weekKey: snapWeekFor(board, now) },
+    orderBy: { rank: 'asc' },
     take: limit,
+    include: { user: { select: { displayName: true, publicHandle: true } } },
   });
-  const value = (s: (typeof rows)[number]) =>
-    kind === 'XP' ? s.lifetimeXp : kind === 'STREAK' ? s.longestStreak : Number(s.totalVolume) / 100;
-  return rows.map((s, i) => ({
-    rank: i + 1,
-    name: s.user.publicHandle ?? s.user.displayName,
-    value: Math.round(value(s)),
-    isSelf: s.userId === userId,
-  }));
+
+  let rows: BoardRowOut[];
+  let full: { userId: string; value: number }[] | null = null;
+  if (snaps.length > 0) {
+    rows = snaps.map((s) => ({ rank: s.rank, name: s.user.publicHandle ?? s.user.displayName, value: Math.round(s.value), isSelf: s.userId === userId }));
+  } else {
+    // No snapshot yet (job hasn't run) — materialize-on-read so the board still renders.
+    full = await buildBoard(board, now);
+    const names = await userNames(full.slice(0, limit).map((f) => f.userId));
+    rows = full.slice(0, limit).map((f, i) => ({ rank: i + 1, name: names.get(f.userId) ?? '—', value: Math.round(f.value), isSelf: f.userId === userId }));
+  }
+
+  // Pin the viewer's true rank (brute-force recompute) when they're off the board.
+  let self: { rank: number; value: number } | null = null;
+  if (!rows.some((r) => r.isSelf)) {
+    full ??= await buildBoard(board, now);
+    const idx = full.findIndex((f) => f.userId === userId);
+    if (idx >= 0) self = { rank: idx + 1, value: Math.round(full[idx]!.value) };
+  }
+  return { rows, self };
+}
+
+async function userNames(ids: string[]): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const users = await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, displayName: true, publicHandle: true } });
+  return new Map(users.map((u) => [u.id, u.publicHandle ?? u.displayName]));
 }

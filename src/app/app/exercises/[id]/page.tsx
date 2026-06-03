@@ -1,14 +1,18 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireUser } from '@/lib/auth/guards';
-import { getExercise } from '@/server/queries/exercises';
-import { MUSCLE_LABEL } from '@/domain/muscles/taxonomy';
+import { getExercise, getExerciseSetHistory } from '@/server/queries/exercises';
+import { MUSCLE_LABEL, type Muscle } from '@/domain/muscles/taxonomy';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
 import { Mono, SectionLabel } from '@/components/ui/typography';
 import { IconTile, type IconName } from '@/components/ui/Icon';
+import { LineChart, type ChartPoint } from '@/components/charts/LineChart';
+import { BodyMap } from '@/components/body-map/BodyMap';
 
 export const dynamic = 'force-dynamic';
+
+const short = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 export default async function ExerciseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -17,6 +21,10 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
   if (!ex) notFound();
 
   const links = [...ex.muscleLinks].sort((a, b) => b.weight - a.weight);
+  const history = await getExerciseSetHistory(id, user.id);
+  const trend: ChartPoint[] = history.map((p) => ({ label: short(p.at), value: p.est1RM }));
+  const fatigue = Object.fromEntries(ex.muscleLinks.map((m) => [m.muscle, m.weight])) as Partial<Record<Muscle, number>>;
+  const lowConfidence = history.some((p) => p.lowConfidence);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
@@ -52,6 +60,25 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
             </div>
           ))}
         </div>
+      </Card>
+
+      <Card>
+        <SectionLabel style={{ marginBottom: 14 }}>Est. 1RM trend</SectionLabel>
+        {trend.length > 0 ? (
+          <>
+            <LineChart points={trend} unit="kg" />
+            {lowConfidence && (
+              <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 8 }}>Points with &gt;12 reps are lower-confidence estimates.</div>
+            )}
+          </>
+        ) : (
+          <div style={{ color: 'var(--text-3)', fontSize: 14, padding: '20px 0' }}>No sets logged yet — finish a workout with this exercise.</div>
+        )}
+      </Card>
+
+      <Card>
+        <SectionLabel style={{ marginBottom: 14 }}>Muscle map</SectionLabel>
+        <BodyMap fatigue={fatigue} />
       </Card>
 
       <Card>

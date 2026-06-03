@@ -1,15 +1,17 @@
 import type { MetadataRoute } from 'next';
+import { getSettings } from '@/lib/settings';
 
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const s = await getSettings();
   return {
-    name: '1MoreRep',
-    short_name: '1MoreRep',
+    name: s.brandName,
+    short_name: s.brandName,
     description: 'A calm, data-confident gym tracker.',
     start_url: '/app?source=pwa',
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
-    theme_color: '#e2553a',
+    theme_color: s.themeColor,
     background_color: '#f1eee6',
     icons: [
       { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

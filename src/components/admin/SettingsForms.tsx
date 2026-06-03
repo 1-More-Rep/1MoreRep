@@ -6,7 +6,9 @@ import {
   updateGeneralSettingsAction,
   updateSmtpAction,
   updateLlmAction,
+  updateBrandingAction,
   testSmtpAction,
+  testLlmAction,
   type AdminState,
 } from '@/server/actions/admin';
 import { Card } from '@/components/ui/Card';
@@ -87,7 +89,9 @@ export function SmtpForm({ s }: { s: InstanceSettings }) {
 
 export function LlmForm({ s }: { s: InstanceSettings }) {
   const [state, action] = useActionState(updateLlmAction, empty);
+  const [test, testAction] = useActionState(async () => testLlmAction(), empty);
   const [provider, setProvider] = useState(s.llmProvider);
+  const unsupported = provider === 'ANTHROPIC' || provider === 'OPENAI';
   return (
     <Card>
       <SectionLabel style={{ marginBottom: 14 }}>Workout generator LLM</SectionLabel>
@@ -100,8 +104,8 @@ export function LlmForm({ s }: { s: InstanceSettings }) {
             <select name="llmProvider" value={provider} onChange={(e) => setProvider(e.target.value)} style={selectStyle}>
               <option value="NONE">None (deterministic only)</option>
               <option value="OLLAMA">Ollama (local)</option>
-              <option value="ANTHROPIC">Anthropic</option>
-              <option value="OPENAI">OpenAI</option>
+              <option value="ANTHROPIC" disabled>Anthropic (coming soon)</option>
+              <option value="OPENAI" disabled>OpenAI (coming soon)</option>
             </select>
           </label>
           <TextField label="Base URL" name="llmBaseUrl" defaultValue={s.llmBaseUrl ?? ''} placeholder="http://ollama:11434" />
@@ -110,7 +114,53 @@ export function LlmForm({ s }: { s: InstanceSettings }) {
             <TextField label="API key" name="llmApiKey" type="password" placeholder={s.llmApiKeyEnc ? '•••••• (unchanged)' : ''} />
           )}
         </div>
-        <Btn type="submit" icon="check" style={{ alignSelf: 'flex-start' }}>Save LLM</Btn>
+        {unsupported && (
+          <Alert kind="error">
+            This provider isn&apos;t implemented yet — saving will be rejected. Use Ollama or None for now.
+          </Alert>
+        )}
+        <Btn type="submit" icon="check" style={{ alignSelf: 'flex-start' }} disabled={unsupported}>Save LLM</Btn>
+      </form>
+      <form action={testAction} style={{ marginTop: 10 }}>
+        <Alert kind="error">{test.error}</Alert>
+        <Alert kind="notice">{test.notice}</Alert>
+        <Btn type="submit" kind="ghost" size="sm">Test prompt</Btn>
+      </form>
+    </Card>
+  );
+}
+
+export function BrandingForm({ s }: { s: InstanceSettings }) {
+  const [state, action] = useActionState(updateBrandingAction, empty);
+  return (
+    <Card>
+      <SectionLabel style={{ marginBottom: 14 }}>Branding</SectionLabel>
+      <form action={action} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <Alert kind="error">{state.error}</Alert>
+        <Alert kind="notice">{state.notice}</Alert>
+        <div style={fieldRow}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Theme color</span>
+            <input
+              type="color"
+              name="themeColor"
+              defaultValue={s.themeColor}
+              style={{ height: 46, width: 80, padding: 4, borderRadius: 'var(--r-sm)', border: '1px solid var(--line-2)', background: 'var(--surface)', cursor: 'pointer' }}
+            />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>
+              Logo {s.brandLogoKey ? '(replace)' : ''}
+            </span>
+            <input
+              type="file"
+              name="brandLogo"
+              accept="image/png,image/jpeg,image/webp"
+              style={{ fontSize: 14, color: 'var(--text-2)' }}
+            />
+          </label>
+        </div>
+        <Btn type="submit" icon="check" style={{ alignSelf: 'flex-start' }}>Save branding</Btn>
       </form>
     </Card>
   );

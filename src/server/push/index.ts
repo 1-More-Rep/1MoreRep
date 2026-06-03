@@ -80,3 +80,15 @@ export async function sendToUser(userId: string, payload: PushPayload, prefKey?:
   }
   return { sent };
 }
+
+/**
+ * Nudge a user to come back and train. Honors the `workoutReminder` preference
+ * and quiet hours via sendToUser. Producer only — the cron caller lives elsewhere.
+ */
+export async function sendWorkoutReminder(userId: string): Promise<{ sent: number; reason?: string }> {
+  return sendToUser(
+    userId,
+    { title: 'Time to train 💪', body: 'You have a workout waiting. Jump back in.', url: '/app/workout/new', tag: 'workout-reminder' },
+    'workoutReminder',
+  );
+}

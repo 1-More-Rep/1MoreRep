@@ -1,10 +1,14 @@
-/* 1MoreRep service worker — app-shell caching + offline fallback + web push. */
-const CACHE = '1mr-v1';
-const PRECACHE = ['/offline', '/icons/icon-192.png'];
+/* 1MoreRep service worker — app-shell precache + offline fallback + data caching + web push. */
+const CACHE = '1mr-v2';
+// App shell: a cold offline start should render the app + offline page.
+const PRECACHE = ['/app', '/offline', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE).catch(() => {})));
+  // addAll is atomic; add individually so one 404 doesn't abort the whole precache.
+  event.waitUntil(
+    caches.open(CACHE).then((c) => Promise.all(PRECACHE.map((u) => c.add(u).catch(() => {})))),
+  );
 });
 
 self.addEventListener('activate', (event) => {
@@ -17,8 +21,17 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/** True if a response is safe to cache (cacheable, same-origin, no auth cookies set). */
+function isCacheable(res) {
+  if (!res || !res.ok || res.type === 'opaque') return false;
+  // Never persist responses that mint/refresh an auth session.
+  if (res.headers.has('set-cookie')) return false;
+  return true;
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
+  // Never touch mutations or cross-origin/auth requests — let them hit the network untouched.
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
@@ -29,18 +42,37 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Hashed static assets + icons: cache-first.
+  // Hashed static assets + icons: cache-first (immutable, safe).
   if (url.pathname.startsWith('/_next/static') || url.pathname.startsWith('/icons')) {
     event.respondWith(
       caches.match(req).then(
         (cached) =>
           cached ||
           fetch(req).then((res) => {
-            const clone = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, clone));
+            if (isCacheable(res)) {
+              const clone = res.clone();
+              caches.open(CACHE).then((c) => c.put(req, clone));
+            }
             return res;
           }),
       ),
+    );
+    return;
+  }
+
+  // Same-origin data GETs (/api/* and app data): network-first, fall back to cache offline.
+  // Successful, cookie-free GET responses are cached so a cold offline start still has data.
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/app')) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (isCacheable(res)) {
+            const clone = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, clone));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req).then((cached) => cached || caches.match('/offline'))),
     );
   }
 });

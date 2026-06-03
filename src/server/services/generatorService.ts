@@ -2,8 +2,8 @@ import 'server-only';
 import type { Equipment, ExCategory } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { computeAndCacheFatigue } from './fatigueService';
-import { generateWorkout } from '@/domain/generator/engine';
-import type { GenGoal, GeneratorInput, GeneratorPlan, PoolExercise } from '@/domain/generator/types';
+import { generateWorkout, swapExercise } from '@/domain/generator/engine';
+import type { Experience, GenGoal, GeneratorInput, GeneratorPlan, PoolExercise } from '@/domain/generator/types';
 import { MUSCLES, type Muscle } from '@/domain/muscles/taxonomy';
 
 const RESISTANCE_CATEGORIES = ['STRENGTH', 'POWERLIFTING', 'OLYMPIC', 'STRONGMAN'] as const;
@@ -16,7 +16,7 @@ export interface GenerateOptions {
 }
 
 /** Per-muscle weekly hard-set volume (fractional, by muscle weight) over 7 days. */
-async function weeklyVolumeByMuscle(userId: string, now: Date): Promise<Record<Muscle, number>> {
+export async function weeklyVolumeByMuscle(userId: string, now: Date): Promise<Record<Muscle, number>> {
   const since = new Date(now.getTime() - 7 * 24 * HOUR);
   const sessions = await prisma.workoutSession.findMany({
     where: { ownerId: userId, status: 'COMPLETED', completedAt: { gte: since } },
@@ -97,8 +97,10 @@ async function recentlyUsedExerciseIds(userId: string): Promise<string[]> {
   return [...new Set(recent.flatMap((s) => s.entries.map((e) => e.exerciseId)))];
 }
 
-export async function generatePlan(userId: string, opts: GenerateOptions, now: Date = new Date()): Promise<GeneratorPlan> {
-  const [fatigue, volume, pool, history, recentlyUsed] = await Promise.all([
+/** Assemble the full GeneratorInput for a user (shared by generate + swap). */
+export async function buildGeneratorInput(userId: string, opts: GenerateOptions, now: Date = new Date()): Promise<GeneratorInput> {
+  const [user, fatigue, volume, pool, history, recentlyUsed] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { experienceLevel: true } }),
     computeAndCacheFatigue(userId, now),
     weeklyVolumeByMuscle(userId, now),
     buildPool(userId, opts.equipment),
@@ -109,15 +111,21 @@ export async function generatePlan(userId: string, opts: GenerateOptions, now: D
   const perMuscle = {} as GeneratorInput['perMuscle'];
   for (const m of MUSCLES) perMuscle[m] = { fatigue: fatigue[m].fatigue, weeklyVolume: volume[m] };
 
-  return generateWorkout({
-    goal: opts.goal,
-    availableTimeMin: opts.availableTimeMin,
-    experience: 'INTERMEDIATE',
-    perMuscle,
-    pool,
-    history,
-    recentlyUsed,
-  });
+  // Personalize from the user's onboarding experience (default INTERMEDIATE).
+  const experience: Experience = (user?.experienceLevel as Experience | null) ?? 'INTERMEDIATE';
+
+  return { goal: opts.goal, availableTimeMin: opts.availableTimeMin, experience, perMuscle, pool, history, recentlyUsed };
+}
+
+export async function generatePlan(userId: string, opts: GenerateOptions, now: Date = new Date()): Promise<GeneratorPlan> {
+  const input = await buildGeneratorInput(userId, opts, now);
+  return generateWorkout(input);
+}
+
+/** Re-run candidate selection for one slot, returning the plan with that slot swapped. */
+export async function swapPlanExercise(userId: string, opts: GenerateOptions, plan: GeneratorPlan, index: number, now: Date = new Date()): Promise<GeneratorPlan> {
+  const input = await buildGeneratorInput(userId, opts, now);
+  return swapExercise(input, plan, index);
 }
 
 /** Materialize a generated plan as a fresh ACTIVE session and return its id. */

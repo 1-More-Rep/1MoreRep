@@ -8,6 +8,7 @@ import {
   searchUsersAction,
   sendRequestByHandleAction,
   blockUserActionResult,
+  generateInviteLinkAction,
 } from '@/server/actions/social';
 import { Card } from '@/components/ui/Card';
 import { Btn } from '@/components/ui/Btn';
@@ -34,6 +35,7 @@ export function FriendsManager({ friends, requests }: { friends: FriendLite[]; r
   const [results, setResults] = useState<SearchHit[]>([]);
   const [searching, setSearching] = useState(false);
   const [msg, setMsg] = useState<{ error?: string; notice?: string }>({});
+  const [copied, setCopied] = useState(false);
   const seq = useRef(0);
 
   // Debounced live lookup (≥2 chars). The latest query wins (seq guard).
@@ -65,6 +67,19 @@ export function FriendsManager({ friends, requests }: { friends: FriendLite[]; r
       if (r.notice) {
         setQuery('');
         setResults([]);
+      }
+    });
+  }
+
+  function copyInvite() {
+    start(async () => {
+      try {
+        const { url } = await generateInviteLinkAction();
+        await navigator.clipboard.writeText(location.origin + url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        setMsg({ error: 'Could not copy invite link.' });
       }
     });
   }
@@ -106,6 +121,10 @@ export function FriendsManager({ friends, requests }: { friends: FriendLite[]; r
             ))}
           </div>
         )}
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Btn kind="soft" size="sm" icon="plus" onClick={copyInvite}>{copied ? 'Copied!' : 'Copy invite link'}</Btn>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Share a link to connect instantly.</span>
+        </div>
       </Card>
 
       {requests.length > 0 && (

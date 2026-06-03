@@ -55,9 +55,14 @@ export async function sendMagicLink(type: TokenType, to: string, url: string): P
   return sendMail({ to, subject, html, text });
 }
 
-/** Verify SMTP connectivity (admin "send test" support). */
-export async function verifySmtp(): Promise<{ ok: boolean; error?: string }> {
-  const smtp = resolveSmtp(await getSettings());
+/**
+ * Verify SMTP connectivity (admin "send test" support). When `sendTo` is given,
+ * also delivers a small test email and surfaces any send error; otherwise only
+ * the connection is verified.
+ */
+export async function verifySmtp(sendTo?: string | null): Promise<{ ok: boolean; sent?: boolean; error?: string }> {
+  const settings = await getSettings();
+  const smtp = resolveSmtp(settings);
   if (!smtp) return { ok: false, error: 'SMTP not configured' };
   try {
     const t = nodemailer.createTransport({
@@ -67,7 +72,16 @@ export async function verifySmtp(): Promise<{ ok: boolean; error?: string }> {
       auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
     });
     await t.verify();
-    return { ok: true };
+
+    const recipient = sendTo?.trim() || smtp.from;
+    if (recipient) {
+      const subject = `${settings.brandName} — SMTP test`;
+      const text = `This is a test email from ${settings.brandName}. If you received it, outgoing mail is working.`;
+      const html = `<p>This is a test email from <strong>${settings.brandName}</strong>. If you received it, outgoing mail is working.</p>`;
+      await t.sendMail({ from: smtp.from, to: recipient, subject, html, text });
+      return { ok: true, sent: true };
+    }
+    return { ok: true, sent: false };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'verify failed' };
   }

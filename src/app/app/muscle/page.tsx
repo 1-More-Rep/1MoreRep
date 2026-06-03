@@ -1,6 +1,8 @@
 import { requireUser } from '@/lib/auth/guards';
 import { prisma } from '@/server/db/prisma';
 import { computeAndCacheFatigue } from '@/server/services/fatigueService';
+import { weeklyVolumeByMuscle } from '@/server/services/generatorService';
+import { LANDMARKS } from '@/domain/generator/landmarks';
 import { MUSCLES, type Muscle } from '@/domain/muscles/taxonomy';
 import { MuscleOverview, type MuscleInfo } from '@/components/body-map/MuscleOverview';
 
@@ -9,9 +11,17 @@ export const dynamic = 'force-dynamic';
 export default async function MusclePage() {
   const user = await requireUser();
   const fatigue = await computeAndCacheFatigue(user.id);
+  const weeklyVolume = await weeklyVolumeByMuscle(user.id, new Date());
 
   const data = {} as Record<Muscle, MuscleInfo>;
-  for (const m of MUSCLES) data[m] = { fatigue: fatigue[m].fatigue, recoveryEtaHours: fatigue[m].recoveryEtaHours };
+  for (const m of MUSCLES) {
+    data[m] = {
+      fatigue: fatigue[m].fatigue,
+      recoveryEtaHours: fatigue[m].recoveryEtaHours,
+      weeklyVolume: weeklyVolume[m],
+      landmarks: LANDMARKS[m],
+    };
+  }
 
   // Top exercises per muscle (primary), for the "train it" links.
   const exercises = await prisma.exercise.findMany({

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { generateWorkout } from './engine';
+import { generateWorkout, swapExercise } from './engine';
 import { MUSCLES, type Muscle } from '../muscles/taxonomy';
-import type { GeneratorInput, PoolExercise } from './types';
+import type { GeneratorInput, GeneratorPlan, PoolExercise } from './types';
 
 const POOL: PoolExercise[] = [
   { id: 'squat', slug: 'squat', name: 'Back Squat', mechanic: 'COMPOUND', equipment: 'BARBELL', defaultRestSec: 180, muscleWeights: [{ muscle: 'QUADS', weight: 1, role: 'PRIMARY' }, { muscle: 'GLUTES', weight: 0.7, role: 'SECONDARY' }, { muscle: 'HAMSTRINGS', weight: 0.4, role: 'SECONDARY' }] },
@@ -90,5 +90,35 @@ describe('generateWorkout', () => {
     expect(squat?.loadSuggestionKg).toBe(102.5);
     const noHist = plan.exercises.find((e) => e.exerciseId === 'bench');
     expect(noHist?.loadSuggestionKg ?? null).toBeNull();
+  });
+
+  it('matches a deterministic snapshot for representative inputs (Gen-T6)', () => {
+    expect(generateWorkout(input({ goal: 'HYPERTROPHY', availableTimeMin: 60 }))).toMatchSnapshot();
+    expect(generateWorkout(input({ goal: 'STRENGTH', availableTimeMin: 90 }))).toMatchSnapshot();
+  });
+
+  it('force-covers a high-priority uncovered muscle by swapping a selection (Gen-T6)', () => {
+    const pool = POOL.filter((e) => ['squat', 'bench', 'row', 'lateral'].includes(e.id));
+    const plan = generateWorkout(input({ pool, availableTimeMin: 30 })); // 3 slots, 4 candidates
+    expect(names(plan)).toContain('Lateral Raise'); // SIDE_DELTS forced in
+    expect(plan.rationale.some((r) => /^Forced/.test(r))).toBe(true);
+  });
+
+  it('supersets antagonist pairs only when time is tight (Gen-T4)', () => {
+    const pair = POOL.filter((e) => e.id === 'bench' || e.id === 'row'); // CHEST + LATS = antagonists
+    const tight = generateWorkout(input({ pool: pair, availableTimeMin: 30 }));
+    const relaxed = generateWorkout(input({ pool: pair, availableTimeMin: 90 }));
+    expect(tight.exercises.filter((e) => e.supersetGroup != null).length).toBe(2);
+    expect(relaxed.exercises.every((e) => e.supersetGroup === undefined)).toBe(true);
+  });
+
+  it('swaps a slot to a different exercise for the same muscle (Gen-T3)', () => {
+    const plan: GeneratorPlan = {
+      rationale: [],
+      exercises: [{ exerciseId: 'squat', name: 'Back Squat', primaryMuscle: 'QUADS', sets: 3, repLow: 8, repHigh: 12, restSec: 120, rpeTarget: 8, loadSuggestionKg: null }],
+    };
+    const swapped = swapExercise(input({ pool: POOL }), plan, 0);
+    expect(swapped.exercises[0]!.exerciseId).not.toBe('squat');
+    expect(swapped.exercises[0]!.primaryMuscle).toBe('QUADS'); // Leg Press keeps the muscle
   });
 });

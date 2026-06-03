@@ -26,10 +26,13 @@ async function ownedEntry(entryId: string, userId: string) {
   return e;
 }
 
-/** Start a session, optionally from a routine (copying its items + snapshot). */
+/**
+ * Start a session. Optionally seed entries from a routine (copying its items +
+ * snapshot) or from a previous session (`fromSessionId`, "repeat workout").
+ */
 export async function startSession(
   userId: string,
-  opts: { routineId?: string; name?: string; goal?: Goal } = {},
+  opts: { routineId?: string; fromSessionId?: string; name?: string; goal?: Goal } = {},
 ): Promise<string> {
   // Only one active session at a time — abandon any prior active session.
   await prisma.workoutSession.updateMany({
@@ -42,7 +45,27 @@ export async function startSession(
   let name = opts.name;
   let goal = opts.goal;
 
-  if (opts.routineId) {
+  if (opts.fromSessionId) {
+    const src = await prisma.workoutSession.findUnique({
+      where: { id: opts.fromSessionId },
+      include: { entries: { where: { isRemoved: false }, orderBy: { order: 'asc' } } },
+    });
+    if (!src || src.ownerId !== userId) throw new AuthorizationError();
+    name ??= src.name ?? undefined;
+    goal ??= src.goal ?? undefined;
+    entriesCreate = src.entries.map((e, i) => ({
+      exercise: { connect: { id: e.exerciseId } },
+      order: i,
+      supersetGroup: e.supersetGroup,
+      originRoutineItemId: null, // a repeat isn't bound to a routine item
+      targetSets: e.targetSets,
+      targetRepLow: e.targetRepLow,
+      targetRepHigh: e.targetRepHigh,
+      targetRestSec: e.targetRestSec,
+      targetRpe: e.targetRpe,
+      sets: { create: placeholderSets(e.targetSets) },
+    }));
+  } else if (opts.routineId) {
     const routine = await prisma.routine.findUnique({
       where: { id: opts.routineId },
       include: { items: { orderBy: { order: 'asc' }, include: { exercise: true } } },

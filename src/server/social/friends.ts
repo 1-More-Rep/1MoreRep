@@ -2,6 +2,15 @@ import 'server-only';
 import type { FriendStatus } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { AuthorizationError } from '@/lib/auth/guards';
+import { sendToUser } from '@/server/push';
+import { logger } from '@/lib/logger';
+
+/** Best-effort friend-activity web push — never throws into the calling request. */
+function notifyFriendActivity(userId: string, title: string, body: string): void {
+  void sendToUser(userId, { title, body, url: '/app/social/friends', tag: 'friend-activity' }, 'friendActivity').catch((e) => {
+    logger.warn({ err: e, userId }, 'friend-activity push failed');
+  });
+}
 
 /** Public-safe user projection — never exposes email or internal-only fields. */
 const publicUserSelect = { id: true, displayName: true, publicHandle: true, avatarKey: true } as const;
@@ -56,6 +65,7 @@ export async function sendFriendRequest(requesterId: string, handle: string): Pr
     create: { requesterId, addresseeId: target.id, status: 'PENDING' },
   });
   await prisma.notification.create({ data: { userId: target.id, kind: 'FRIEND_REQUEST', title: 'New friend request', body: 'Someone wants to connect.' } });
+  notifyFriendActivity(target.id, 'New friend request', 'Someone wants to connect.');
   return { ok: true };
 }
 
@@ -66,6 +76,7 @@ export async function respondToRequest(userId: string, requesterId: string, acce
     where: { id: req.id },
     data: { status: accept ? 'ACCEPTED' : 'DECLINED', respondedAt: new Date() },
   });
+  if (accept) notifyFriendActivity(requesterId, 'Friend request accepted', 'You have a new friend.');
 }
 
 export async function removeFriend(userId: string, otherId: string): Promise<void> {

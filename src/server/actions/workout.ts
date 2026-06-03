@@ -14,6 +14,12 @@ export async function startWorkoutAction(routineId?: string): Promise<void> {
   redirect(ACTIVE);
 }
 
+export async function repeatWorkoutAction(fromSessionId: string): Promise<void> {
+  const user = await requireUser();
+  await svc.startSession(user.id, { fromSessionId });
+  redirect(ACTIVE);
+}
+
 export interface UIEntry {
   id: string;
   exerciseId: string;

@@ -3,8 +3,10 @@ import { notFound } from 'next/navigation';
 import { requireUser } from '@/lib/auth/guards';
 import { getSessionDetail, sessionVolume, completedSetCount } from '@/server/queries/sessions';
 import { prisma } from '@/server/db/prisma';
+import { repeatWorkoutAction } from '@/server/actions/workout';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
+import { Btn } from '@/components/ui/Btn';
 import { Mono, SectionLabel } from '@/components/ui/typography';
 import { IconTile, type IconName } from '@/components/ui/Icon';
 
@@ -29,13 +31,18 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
       <Link href="/app/history" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← History</Link>
-      <div>
-        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{session.name ?? 'Workout'}</h1>
-        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-          <Chip><Mono>{completedSetCount(entries)}</Mono>&nbsp;sets</Chip>
-          <Chip><Mono>{sessionVolume(entries).toLocaleString()}</Mono>&nbsp;kg·reps</Chip>
-          {session.durationSec != null && <Chip><Mono>{Math.round(session.durationSec / 60)}m</Mono></Chip>}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 auto' }}>
+          <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{session.name ?? 'Workout'}</h1>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+            <Chip><Mono>{completedSetCount(entries)}</Mono>&nbsp;sets</Chip>
+            <Chip><Mono>{sessionVolume(entries).toLocaleString()}</Mono>&nbsp;kg·reps</Chip>
+            {session.durationSec != null && <Chip><Mono>{Math.round(session.durationSec / 60)}m</Mono></Chip>}
+          </div>
         </div>
+        <form action={repeatWorkoutAction.bind(null, session.id)}>
+          <Btn type="submit" icon="play">Repeat</Btn>
+        </form>
       </div>
 
       {session.notes && (

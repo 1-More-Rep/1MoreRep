@@ -46,6 +46,17 @@ export function completedSetCount(entries: { sets: { completed: boolean; isWarmu
   return n;
 }
 
+/** completedAt timestamps of a user's COMPLETED sessions (for calendar/heatmap). */
+export async function getCompletedSessionDates(userId: string, take = 400): Promise<Date[]> {
+  const rows = await prisma.workoutSession.findMany({
+    where: { ownerId: userId, status: 'COMPLETED', completedAt: { not: null } },
+    orderBy: { completedAt: 'desc' },
+    take,
+    select: { completedAt: true },
+  });
+  return rows.map((r) => r.completedAt!).filter(Boolean);
+}
+
 export interface UserSessionRow {
   id: string;
   userAgent: string | null;

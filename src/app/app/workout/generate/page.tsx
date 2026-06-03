@@ -1,11 +1,17 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth/guards';
 import { GeneratorFlow } from '@/components/workout/GeneratorFlow';
+import type { GenGoal } from '@/domain/generator/types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function GenerateWorkoutPage() {
-  await requireUser();
+const GOALS: GenGoal[] = ['HYPERTROPHY', 'STRENGTH', 'ENDURANCE', 'GENERAL'];
+
+export default async function GenerateWorkoutPage({ searchParams }: { searchParams: Promise<{ goal?: string }> }) {
+  const user = await requireUser();
+  const { goal } = await searchParams;
+  // Seed the goal from the onboarding hand-off (?goal=) or the user's saved primary goal.
+  const initialGoal = (GOALS.includes(goal as GenGoal) ? (goal as GenGoal) : (user.primaryGoal as GenGoal | null)) ?? undefined;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)', maxWidth: 560 }}>
       <Link href="/app/workout/new" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← Start a workout</Link>
@@ -15,7 +21,7 @@ export default async function GenerateWorkoutPage() {
           We&apos;ll pick exercises for muscles that are recovered and under-trained.
         </p>
       </div>
-      <GeneratorFlow />
+      <GeneratorFlow initialGoal={initialGoal} />
     </div>
   );
 }

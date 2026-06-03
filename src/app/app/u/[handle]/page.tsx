@@ -4,7 +4,7 @@ import { prisma } from '@/server/db/prisma';
 import { getPrivacy, canView } from '@/server/social/privacy';
 import { friendshipStatus } from '@/server/social/friends';
 import { levelProgress } from '@/domain/gamification/xp';
-import { Card, Chip, Mono, Ring, SectionLabel } from '@/components/ui';
+import { Btn, Card, Chip, Mono, Ring, SectionLabel } from '@/components/ui';
 import { ProfileFriendButton } from '@/components/social/ProfileFriendButton';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +37,12 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
         </div>
         {status !== 'SELF' && <ProfileFriendButton handle={target.publicHandle!} userId={target.id} status={status} />}
       </div>
+
+      {status === 'ACCEPTED' && target.publicHandle && (
+        <Btn href={`/app/social/compare?with=${encodeURIComponent(target.publicHandle)}`} kind="soft" icon="target" style={{ alignSelf: 'flex-start' }}>
+          Compare stats
+        </Btn>
+      )}
 
       {canStats && progress && target.stats ? (
         <>

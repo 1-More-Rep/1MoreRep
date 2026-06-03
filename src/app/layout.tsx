@@ -11,6 +11,7 @@ import { headers } from 'next/headers';
 import './globals.css';
 import { ThemeProvider, themeBootScript } from '@/components/theme/ThemeProvider';
 import { PwaRegister } from '@/components/pwa/PwaRegister';
+import { getSettings } from '@/lib/settings';
 
 const manrope = Manrope({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'], variable: '--font-manrope', display: 'swap' });
 const hanken = Hanken_Grotesk({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'], variable: '--font-hanken', display: 'swap' });
@@ -23,18 +24,24 @@ const fontVars = [manrope, hanken, spaceGrotesk, jetbrainsMono, spaceMono, ibmPl
   .map((f) => f.variable)
   .join(' ');
 
-export const metadata: Metadata = {
-  title: '1MoreRep',
-  description: 'A calm, data-confident gym tracker.',
-  applicationName: '1MoreRep',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { brandName } = await getSettings();
+  return {
+    title: brandName,
+    description: 'A calm, data-confident gym tracker.',
+    applicationName: brandName,
+  };
+}
 
-export const viewport: Viewport = {
-  themeColor: '#e2553a',
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
-};
+export async function generateViewport(): Promise<Viewport> {
+  const { themeColor } = await getSettings();
+  return {
+    themeColor,
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+  };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = (await headers()).get('x-nonce') ?? undefined;

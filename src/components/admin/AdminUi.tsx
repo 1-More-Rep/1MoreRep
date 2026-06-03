@@ -7,6 +7,7 @@ import {
   setRoleAction,
   toggleActiveAction,
   resetUserAction,
+  impersonateUserAction,
   type AdminState,
 } from '@/server/actions/admin';
 import { Btn } from '@/components/ui/Btn';
@@ -49,8 +50,11 @@ export function UserActions({ user, canManageSuperadmin }: { user: AdminUserRow;
   const [roleState, roleAction] = useActionState(setRoleAction, empty);
   const [activeState, activeAction] = useActionState(toggleActiveAction, empty);
   const [resetState, resetAction] = useActionState(resetUserAction, empty);
+  const [impState, impAction] = useActionState(impersonateUserAction, empty);
   const deactivated = user.status === 'DEACTIVATED';
-  const err = roleState.error || activeState.error || resetState.error;
+  const err = roleState.error || activeState.error || resetState.error || impState.error;
+  // An admin must not impersonate a superadmin; nobody impersonates themselves or a disabled account.
+  const canImpersonate = !user.self && !deactivated && (user.role !== 'SUPERADMIN' || canManageSuperadmin);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
@@ -67,6 +71,12 @@ export function UserActions({ user, canManageSuperadmin }: { user: AdminUserRow;
           <input type="hidden" name="targetId" value={user.id} />
           <Btn type="submit" kind="ghost" size="sm">Reset</Btn>
         </form>
+        {canImpersonate && (
+          <form action={impAction}>
+            <input type="hidden" name="targetId" value={user.id} />
+            <Btn type="submit" kind="ghost" size="sm" icon="user">View as</Btn>
+          </form>
+        )}
         {!user.self && (
           <form action={activeAction}>
             <input type="hidden" name="targetId" value={user.id} />

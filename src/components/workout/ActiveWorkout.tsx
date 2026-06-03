@@ -32,6 +32,23 @@ function fmt(secs: number) {
   return `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
 }
 
+/** Local (client-side) rest-timer-done notification. Best-effort, permission-gated. */
+function notifyRestDone() {
+  if (typeof window === 'undefined' || typeof Notification === 'undefined') return;
+  if (Notification.permission !== 'granted') return;
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.ready
+    .then((reg) =>
+      reg.showNotification('Rest complete', {
+        body: 'Time for your next set 💪',
+        icon: '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
+        tag: 'rest-timer-done',
+      }),
+    )
+    .catch(() => {});
+}
+
 export function ActiveWorkout({ session }: { session: ActiveSessionData }) {
   const [entries, setEntries] = useState<UIEntry[]>(session.entries);
   const [, startTx] = useTransition();
@@ -51,7 +68,10 @@ export function ActiveWorkout({ session }: { session: ActiveSessionData }) {
     const id = setInterval(() => {
       const left = Math.max(0, Math.round((rest.ends - Date.now()) / 1000));
       setRestLeft(left);
-      if (left <= 0) setRest(null);
+      if (left <= 0) {
+        setRest(null);
+        notifyRestDone();
+      }
     }, 250);
     return () => clearInterval(id);
   }, [rest]);

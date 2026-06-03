@@ -18,6 +18,25 @@ export async function getCurrentUser(): Promise<User | null> {
   return s?.user ?? null;
 }
 
+export interface Impersonation {
+  /** The user currently being viewed-as (governs access while impersonating). */
+  user: User;
+  /** The real admin's userId who started the impersonation. */
+  impersonatorId: string;
+}
+
+/**
+ * If the current session is an impersonation, returns the impersonated user and
+ * the real admin's id so a layout can render an "Exit" banner. Returns null when
+ * not impersonating. Does NOT alter requireUser/requireRole semantics — the
+ * impersonated user's own role continues to govern access.
+ */
+export async function getImpersonation(): Promise<Impersonation | null> {
+  const s = await validateSession();
+  if (!s?.impersonatorId) return null;
+  return { user: s.user, impersonatorId: s.impersonatorId };
+}
+
 /** Require an authenticated user; redirect to /login otherwise. */
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();

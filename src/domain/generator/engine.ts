@@ -54,6 +54,21 @@ function primaryMuscle(ex: PoolExercise): Muscle {
 
 const LARGE_FIRST: Muscle[] = ['QUADS', 'HAMSTRINGS', 'GLUTES', 'LATS', 'CHEST', 'TRAPS', 'RHOMBOIDS', 'LOWER_BACK'];
 
+// Antagonist (opposing) muscle pairs — supersetting these saves time without
+// compromising either lift (one rests while the other works).
+const ANTAGONIST_PAIRS: [Muscle, Muscle][] = [
+  ['CHEST', 'LATS'],
+  ['BICEPS', 'TRICEPS'],
+  ['QUADS', 'HAMSTRINGS'],
+  ['FRONT_DELTS', 'REAR_DELTS'],
+  ['ABS', 'LOWER_BACK'],
+];
+function areAntagonists(a: Muscle, b: Muscle): boolean {
+  return ANTAGONIST_PAIRS.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
+}
+// Tight sessions get antagonist supersets to fit the work into the time budget.
+const TIME_TIGHT_MIN = 45;
+
 function plateIncrement(equipment: string): number {
   if (equipment === 'DUMBBELL' || equipment === 'KETTLEBELL') return 1;
   return 2.5;
@@ -179,5 +194,60 @@ export function generateWorkout(input: GeneratorInput): GeneratorPlan {
     loadSuggestionKg: loadSuggestion(ex, input, scheme),
   }));
 
+  // When time is tight, pair adjacent antagonist exercises into supersets so the
+  // work fits the budget (one muscle rests while the other works).
+  if (input.availableTimeMin <= TIME_TIGHT_MIN) {
+    let group = 1;
+    for (let i = 0; i < exercises.length - 1; i++) {
+      const a = exercises[i]!;
+      const b = exercises[i + 1]!;
+      if (a.supersetGroup != null || b.supersetGroup != null) continue;
+      if (areAntagonists(a.primaryMuscle, b.primaryMuscle)) {
+        a.supersetGroup = group;
+        b.supersetGroup = group;
+        group++;
+        rationale.push(`Superset ${MUSCLE_LABEL[a.primaryMuscle]} + ${MUSCLE_LABEL[b.primaryMuscle]} (time-tight)`);
+      }
+    }
+  }
+
   return { exercises, rationale };
+}
+
+/**
+ * Replace the exercise at `index` with the next-best alternative for the same
+ * primary muscle (deterministic; excludes exercises already in the plan).
+ * Returns the original plan unchanged if no alternative exists.
+ */
+export function swapExercise(input: GeneratorInput, plan: GeneratorPlan, index: number): GeneratorPlan {
+  const slot = plan.exercises[index];
+  if (!slot) return plan;
+  const scheme = SCHEMES[input.goal];
+  const used = new Set(plan.exercises.map((e) => e.exerciseId));
+  const rank = (a: PoolExercise, b: PoolExercise) => {
+    const aw = a.muscleWeights.find((m) => m.muscle === slot.primaryMuscle)?.weight ?? 0;
+    const bw = b.muscleWeights.find((m) => m.muscle === slot.primaryMuscle)?.weight ?? 0;
+    if (aw !== bw) return bw - aw; // strongest contribution first
+    return a.slug.localeCompare(b.slug); // deterministic tie-break
+  };
+  const candidates = input.pool
+    .filter((ex) => !used.has(ex.id) && !isExcluded(primaryMuscle(ex), input))
+    .filter((ex) => primaryMuscle(ex) === slot.primaryMuscle || ex.muscleWeights.some((mw) => mw.muscle === slot.primaryMuscle && mw.weight >= 0.5))
+    .sort(rank);
+  // Prefer a candidate whose PRIMARY muscle matches the slot (keeps coverage).
+  const pick = candidates.find((ex) => primaryMuscle(ex) === slot.primaryMuscle) ?? candidates[0];
+  if (!pick) return plan;
+  const replacement: PlannedExercise = {
+    exerciseId: pick.id,
+    name: pick.name,
+    primaryMuscle: primaryMuscle(pick),
+    sets: scheme.setsPerEx,
+    repLow: scheme.repLow,
+    repHigh: scheme.repHigh,
+    restSec: scheme.restSec,
+    rpeTarget: scheme.rpe,
+    loadSuggestionKg: loadSuggestion(pick, input, scheme),
+    supersetGroup: slot.supersetGroup,
+  };
+  return { exercises: plan.exercises.map((e, i) => (i === index ? replacement : e)), rationale: plan.rationale };
 }
