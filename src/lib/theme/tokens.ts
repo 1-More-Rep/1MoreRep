@@ -50,7 +50,7 @@ const LIGHT = {
   surface2: '#f3f1ea',
   text: '#211f19',
   text2: '#6c685c',
-  text3: '#9c978b',
+  text3: '#6d6960',
   line: '#e6e2d7',
   line2: '#dad5c8',
   onAccent: '#fffaf6',
@@ -65,7 +65,7 @@ const DARK = {
   surface2: '#26231b',
   text: '#f3f0e6',
   text2: '#a7a191',
-  text3: '#726d5e',
+  text3: '#8f897a',
   line: '#2b2820',
   line2: '#39352a',
   onAccent: '#fffaf6',
@@ -91,10 +91,11 @@ export function buildVars(t: ThemeTweaks): Record<string, string> {
   const accent = t.accent;
   return {
     '--accent': accent,
+    '--accent-strong': `color-mix(in oklab, ${accent} 66%, #1a0a06)`,
     '--accent-soft': `color-mix(in oklab, ${accent} 14%, ${c.surface})`,
     '--accent-softer': `color-mix(in oklab, ${accent} 8%, ${c.surface})`,
     '--accent-line': `color-mix(in oklab, ${accent} 34%, ${c.surface})`,
-    '--accent-text': t.dark ? `color-mix(in oklab, ${accent} 78%, white)` : accent,
+    '--accent-text': t.dark ? `color-mix(in oklab, ${accent} 78%, white)` : `color-mix(in oklab, ${accent} 58%, #000)`,
     '--on-accent': c.onAccent,
 
     '--bg': c.bg,

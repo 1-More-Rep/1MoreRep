@@ -7,7 +7,7 @@ describe('buildVars', () => {
     expect(v['--bg']).toBe('#f1eee6');
     expect(v['--surface']).toBe('#fbfaf6');
     expect(v['--accent']).toBe('#e2553a');
-    expect(v['--accent-text']).toBe('#e2553a'); // light: accent-text == accent
+    expect(v['--accent-text']).toContain('color-mix'); // light: darkened accent for AA-readable text
   });
 
   it('switches to dark palette', () => {

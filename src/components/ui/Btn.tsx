@@ -23,7 +23,7 @@ const SIZES: Record<Size, { h: number; px: number; fs: number; gap: number }> = 
 
 const KINDS: Record<Kind, CSSProperties> = {
   primary: {
-    background: 'var(--accent)',
+    background: 'var(--accent-strong)',
     color: 'var(--on-accent)',
     border: '1px solid transparent',
     boxShadow: 'var(--shadow-sm)',

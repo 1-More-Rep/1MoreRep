@@ -34,7 +34,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
               fontSize: 13.5,
               fontWeight: 600,
               textDecoration: 'none',
-              background: t.kind === kind ? 'var(--accent)' : 'var(--surface-2)',
+              background: t.kind === kind ? 'var(--accent-strong)' : 'var(--surface-2)',
               color: t.kind === kind ? 'var(--on-accent)' : 'var(--text-2)',
               border: `1px solid ${t.kind === kind ? 'transparent' : 'var(--line)'}`,
             }}
