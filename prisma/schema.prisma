@@ -95,6 +95,8 @@ model User {
   blocksReceived   Block[]      @relation("Blocked")
   privacy          PrivacySettings?
   activityEvents   ActivityEvent[]
+  bodyMetrics      BodyMetric[]
+  progressPhotos   ProgressPhoto[]
 
   @@index([role])
   @@index([status])
@@ -684,4 +686,33 @@ model FriendStreak {
   @@unique([userAId, userBId])
   @@index([userAId])
   @@index([userBId])
+}
+
+// ---------------------------------------------------------------------------
+// Body metrics & progress photos (P10)
+// ---------------------------------------------------------------------------
+
+model BodyMetric {
+  id           String   @id @default(cuid())
+  ownerId      String
+  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  recordedAt   DateTime @default(now())
+  bodyweightKg Float?
+  measurements Json? // { chest, waist, arms, thighs, hips, ... } in cm
+  notes        String?
+
+  @@index([ownerId, recordedAt])
+}
+
+model ProgressPhoto {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  storageKey String  // file under the uploads volume (outside webroot); never a public path
+  width     Int
+  height    Int
+  takenAt   DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([ownerId, takenAt])
 }

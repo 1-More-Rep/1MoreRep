@@ -38,6 +38,9 @@ services:
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       JOB_SECRET: ${JOB_SECRET:-}
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - uploads:/data/uploads
     ports:
       - '${APP_PORT:-3000}:3000'
     healthcheck:
@@ -75,3 +78,4 @@ services:
 
 volumes:
   db_data:
+  uploads:
