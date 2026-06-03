@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth/guards';
 import { getLeaderboard, type LeaderboardKind } from '@/server/queries/gamification';
-import { Card, Chip, Mono, SectionLabel } from '@/components/ui';
+import { Card, Mono, SectionLabel } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 

@@ -20,6 +20,13 @@ export default async function globalSetup() {
       data: { allowSelfRegistration: false, requireEmailVerification: true, brandName: '1MoreRep' },
     });
 
+    // a second user (with a handle) for friends/social E2E
+    await prisma.user.upsert({
+      where: { email: 'frienduser@1morerep.local' },
+      update: { status: 'ACTIVE', publicHandle: 'frienduser' },
+      create: { email: 'frienduser@1morerep.local', displayName: 'Friend User', publicHandle: 'frienduser', status: 'ACTIVE' },
+    });
+
     const user = await prisma.user.findUnique({ where: { email: SUPERADMIN.email } });
     if (user) {
       const id = crypto.randomBytes(24).toString('base64url');

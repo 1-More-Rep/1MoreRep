@@ -46,6 +46,7 @@ export async function ensureSuperadmin(prisma: PrismaClient): Promise<BootstrapR
     data: {
       email,
       displayName: 'Administrator',
+      publicHandle: isProd ? null : 'admin',
       passwordHash: await hashPassword(password),
       role: 'SUPERADMIN',
       status: 'ACTIVE',

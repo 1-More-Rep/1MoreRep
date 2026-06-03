@@ -58,7 +58,13 @@ export async function getLeaderboard(kind: LeaderboardKind, userId: string, limi
   const orderBy =
     kind === 'XP' ? { lifetimeXp: 'desc' as const } : kind === 'STREAK' ? { longestStreak: 'desc' as const } : { totalVolume: 'desc' as const };
   const rows = await prisma.userStats.findMany({
-    where: { user: { status: 'ACTIVE' } },
+    where: {
+      user: {
+        status: 'ACTIVE',
+        // honor leaderboard opt-out (default: opted in)
+        OR: [{ privacy: { is: null } }, { privacy: { leaderboardOptIn: true } }],
+      },
+    },
     include: { user: { select: { displayName: true, publicHandle: true } } },
     orderBy,
     take: limit,

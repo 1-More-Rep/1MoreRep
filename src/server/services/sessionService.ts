@@ -6,6 +6,9 @@ import { AuthorizationError } from '@/lib/auth/guards';
 import { diffSessionVsSnapshot, type LiveEntry, type RoutineDiff, type SnapshotItem } from '@/domain/routine/diff';
 import { applySessionPrs, type NewPr } from './prService';
 import { awardForWorkout, type AwardResult } from '@/server/gamification/award';
+import { dayKey } from '@/domain/gamification/xp';
+import { writeActivity } from '@/server/social/activity';
+import { evaluateFriendStreaks } from '@/server/social/friendStreak';
 
 export type SaveMode = 'NONE' | 'UPDATE_ROUTINE' | 'NEW_ROUTINE';
 
@@ -222,6 +225,19 @@ export async function finishSession(
 
   const newPrs = await applySessionPrs(userId, sessionId);
   const award = await awardForWorkout(userId, sessionId, newPrs.length).catch(() => null);
+
+  // Social: activity feed + friend streaks (best-effort, never block the finish).
+  try {
+    const owner = await prisma.user.findUnique({ where: { id: userId }, select: { timezone: true } });
+    const dk = dayKey(new Date(), owner?.timezone ?? 'UTC');
+    await writeActivity(userId, 'WORKOUT_DONE', { sessionId });
+    if (newPrs.length > 0) await writeActivity(userId, 'PR', { count: newPrs.length });
+    if (award?.leveledUp) await writeActivity(userId, 'LEVEL_UP', { level: award.newLevel });
+    await evaluateFriendStreaks(userId, dk);
+  } catch {
+    /* social side-effects are non-critical */
+  }
+
   return { newPrs, routineId: resultRoutineId, award };
 }
 
