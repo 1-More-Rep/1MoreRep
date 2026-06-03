@@ -27,6 +27,10 @@ export default async function NewWorkoutPage() {
         </Card>
       )}
 
+      <Link href="/app/workout/generate" style={{ textDecoration: 'none' }}>
+        <Btn full size="lg" icon="bolt">Generate a workout</Btn>
+      </Link>
+
       <form action={startWorkoutAction.bind(null, undefined)}>
         <Btn type="submit" kind="soft" full size="lg" icon="plus">Empty workout</Btn>
       </form>
