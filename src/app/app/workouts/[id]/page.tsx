@@ -33,6 +33,7 @@ export default async function RoutineEditorPage({ params }: { params: Promise<{ 
         items={routine.items.map((it) => ({
           id: it.id,
           exerciseName: it.exercise.name,
+          supersetGroup: it.supersetGroup,
           targetSets: it.targetSets,
           targetRepLow: it.targetRepLow,
           targetRepHigh: it.targetRepHigh,

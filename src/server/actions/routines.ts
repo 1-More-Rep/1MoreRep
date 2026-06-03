@@ -61,6 +61,18 @@ export async function updateRoutineItemAction(
   revalidatePath(`/app/workouts/${item.routineId}`);
 }
 
+export async function reorderRoutineItemsAction(routineId: string, orderedItemIds: string[]): Promise<void> {
+  const user = await requireUser();
+  await ownRoutine(routineId, user.id);
+  // Two-phase to avoid transient @@unique([routineId, order]) collisions.
+  const OFFSET = 100000;
+  await prisma.$transaction([
+    ...orderedItemIds.map((id, i) => prisma.routineItem.update({ where: { id }, data: { order: i + OFFSET } })),
+    ...orderedItemIds.map((id, i) => prisma.routineItem.update({ where: { id }, data: { order: i } })),
+  ]);
+  revalidatePath(`/app/workouts/${routineId}`);
+}
+
 export async function removeRoutineItemAction(itemId: string): Promise<void> {
   const user = await requireUser();
   const item = await prisma.routineItem.findUnique({ where: { id: itemId }, include: { routine: true } });

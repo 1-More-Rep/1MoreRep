@@ -22,6 +22,7 @@ export default async function ActiveWorkoutPage() {
         exerciseId: e.exerciseId,
         exerciseName: e.exercise.name,
         iconKey: e.exercise.iconKey,
+        supersetGroup: e.supersetGroup,
         targetSets: e.targetSets,
         targetRepLow: e.targetRepLow,
         targetRepHigh: e.targetRepHigh,

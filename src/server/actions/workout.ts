@@ -19,6 +19,7 @@ export interface UIEntry {
   exerciseId: string;
   exerciseName: string;
   iconKey: string;
+  supersetGroup: number | null;
   targetSets: number;
   targetRepLow: number;
   targetRepHigh: number;
@@ -34,12 +35,19 @@ export async function addExerciseAction(sessionId: string, exerciseId: string): 
     exerciseId: e.exerciseId,
     exerciseName: e.exercise.name,
     iconKey: e.exercise.iconKey,
+    supersetGroup: e.supersetGroup,
     targetSets: e.targetSets,
     targetRepLow: e.targetRepLow,
     targetRepHigh: e.targetRepHigh,
     targetRestSec: e.targetRestSec,
     sets: e.sets.map((s) => ({ setIndex: s.setIndex, weightKg: s.weightKg, reps: s.reps, rpe: s.rpe, isWarmup: s.isWarmup, completed: s.completed })),
   };
+}
+
+export async function reorderEntriesAction(sessionId: string, orderedEntryIds: string[]): Promise<void> {
+  const user = await requireUser();
+  await svc.reorderEntries(user.id, sessionId, orderedEntryIds);
+  revalidatePath(ACTIVE);
 }
 
 export async function removeEntryAction(entryId: string): Promise<void> {
@@ -86,7 +94,7 @@ export async function getWorkoutDiffAction(sessionId: string): Promise<RoutineDi
 
 export async function finishWorkoutAction(
   sessionId: string,
-  opts: { saveMode: svc.SaveMode; newRoutineName?: string; bodyweightKg?: number; durationSec?: number },
+  opts: { saveMode: svc.SaveMode; newRoutineName?: string; bodyweightKg?: number; durationSec?: number; notes?: string },
 ): Promise<void> {
   const user = await requireUser();
   await svc.finishSession(user.id, sessionId, opts);

@@ -38,6 +38,13 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
+      {session.notes && (
+        <Card>
+          <SectionLabel style={{ marginBottom: 8 }}>Notes</SectionLabel>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--text-2)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{session.notes}</p>
+        </Card>
+      )}
+
       {prs.length > 0 && (
         <Card style={{ borderColor: 'var(--accent-line)' }}>
           <SectionLabel style={{ marginBottom: 10 }}>New personal records 🎉</SectionLabel>

@@ -23,6 +23,7 @@ export function FinishModal({
   const [diff, setDiff] = useState<RoutineDiff | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState(defaultName);
+  const [notes, setNotes] = useState('');
   const [pending, startTx] = useTransition();
 
   useEffect(() => {
@@ -36,7 +37,7 @@ export function FinishModal({
   }, [sessionId, fromRoutine]);
 
   function finish(saveMode: SaveMode) {
-    startTx(() => finishWorkoutAction(sessionId, { saveMode, newRoutineName: name, durationSec }));
+    startTx(() => finishWorkoutAction(sessionId, { saveMode, newRoutineName: name, durationSec, notes: notes.trim() || undefined }));
   }
 
   const dirty = diff?.isDirty ?? false;
@@ -74,6 +75,19 @@ export function FinishModal({
               <Btn kind="ghost" full disabled={pending} onClick={() => finish('NONE')}>Just finish</Btn>
             </div>
           </>
+        )}
+
+        {!loading && (
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14 }}>
+            <SectionLabel>Notes (optional)</SectionLabel>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="How did it feel? Anything to remember next time…"
+              rows={2}
+              style={{ ...input, height: 'auto', minHeight: 56, padding: 10, resize: 'vertical', fontFamily: 'var(--font-sans)', lineHeight: 1.4 }}
+            />
+          </label>
         )}
 
         <button onClick={onClose} disabled={pending} style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 13, cursor: 'pointer', width: '100%' }}>

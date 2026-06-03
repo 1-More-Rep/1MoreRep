@@ -7,6 +7,8 @@ import {
   deleteSetAction,
   logSetAction,
   removeEntryAction,
+  reorderEntriesAction,
+  updateTargetsAction,
   type UIEntry,
 } from '@/server/actions/workout';
 import { ExercisePicker } from '@/components/exercises/ExercisePicker';
@@ -97,6 +99,33 @@ export function ActiveWorkout({ session }: { session: ActiveSessionData }) {
     setEntries((prev) => [...prev, created]);
   }
 
+  function move(index: number, dir: -1 | 1) {
+    const j = index + dir;
+    if (j < 0 || j >= entries.length) return;
+    const next = [...entries];
+    [next[index], next[j]] = [next[j]!, next[index]!];
+    setEntries(next);
+    startTx(() => reorderEntriesAction(session.id, next.map((e) => e.id)));
+  }
+
+  function toggleSuperset(index: number) {
+    const entry = entries[index]!;
+    if (entry.supersetGroup != null) {
+      setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, supersetGroup: null } : e)));
+      startTx(() => updateTargetsAction(entry.id, { supersetGroup: null }));
+      return;
+    }
+    const partnerIdx = index < entries.length - 1 ? index + 1 : index - 1;
+    if (partnerIdx < 0) return; // nothing to pair with
+    const partner = entries[partnerIdx]!;
+    const group = partner.supersetGroup ?? Math.max(0, ...entries.map((e) => e.supersetGroup ?? 0)) + 1;
+    setEntries((prev) => prev.map((e) => (e.id === entry.id || e.id === partner.id ? { ...e, supersetGroup: group } : e)));
+    startTx(async () => {
+      await updateTargetsAction(entry.id, { supersetGroup: group });
+      await updateTargetsAction(partner.id, { supersetGroup: group });
+    });
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
       {/* header */}
@@ -139,8 +168,17 @@ export function ActiveWorkout({ session }: { session: ActiveSessionData }) {
       )}
 
       {/* exercises */}
-      {entries.map((entry) => (
-        <Card key={entry.id} pad={false}>
+      {entries.map((entry, index) => {
+        const inSuperset = entry.supersetGroup != null;
+        const firstOfGroup = inSuperset && (index === 0 || entries[index - 1]!.supersetGroup !== entry.supersetGroup);
+        return (
+        <div key={entry.id}>
+          {firstOfGroup && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 6px 4px', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--accent-text)' }}>
+              <Icon name="repeat" size={13} stroke={2} /> Superset
+            </div>
+          )}
+        <Card pad={false} style={inSuperset ? { borderLeft: '3px solid var(--accent)' } : undefined}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 'var(--pad)' }}>
             <IconTile name={entry.iconKey as IconName} variant="soft" size={40} icon={20} />
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -149,6 +187,15 @@ export function ActiveWorkout({ session }: { session: ActiveSessionData }) {
                 target {entry.targetSets} × {entry.targetRepLow}–{entry.targetRepHigh} · {entry.targetRestSec}s
               </div>
             </div>
+            <button onClick={() => move(index, -1)} disabled={index === 0} aria-label={`Move ${entry.exerciseName} up`} style={{ ...iconBtn, opacity: index === 0 ? 0.4 : 1 }}>
+              <Icon name="arrowUp" size={15} />
+            </button>
+            <button onClick={() => move(index, 1)} disabled={index === entries.length - 1} aria-label={`Move ${entry.exerciseName} down`} style={{ ...iconBtn, opacity: index === entries.length - 1 ? 0.4 : 1, transform: 'rotate(180deg)' }}>
+              <Icon name="arrowUp" size={15} />
+            </button>
+            <button onClick={() => toggleSuperset(index)} aria-label={inSuperset ? `Clear superset on ${entry.exerciseName}` : `Superset ${entry.exerciseName}`} aria-pressed={inSuperset} style={{ ...iconBtn, color: inSuperset ? 'var(--accent-text)' : 'var(--text-3)', borderColor: inSuperset ? 'var(--accent-line)' : 'var(--line-2)' }}>
+              <Icon name="repeat" size={15} />
+            </button>
             <button onClick={() => removeExercise(entry)} aria-label={`Remove ${entry.exerciseName}`} style={iconBtn}>
               <Icon name="x" size={16} />
             </button>
@@ -176,7 +223,9 @@ export function ActiveWorkout({ session }: { session: ActiveSessionData }) {
             </div>
           </div>
         </Card>
-      ))}
+        </div>
+        );
+      })}
 
       <ExercisePicker onAdd={addExercise} label="Add exercise" />
 

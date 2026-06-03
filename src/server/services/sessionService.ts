@@ -131,9 +131,13 @@ export async function updateEntryTargets(
 
 export async function reorderEntries(userId: string, sessionId: string, orderedEntryIds: string[]): Promise<void> {
   await ownedSession(sessionId, userId);
-  await prisma.$transaction(
-    orderedEntryIds.map((id, i) => prisma.sessionEntry.update({ where: { id }, data: { order: i } })),
-  );
+  // Two-phase to avoid transient @@unique([sessionId, order]) collisions: park
+  // every row at a high offset first, then assign the final contiguous orders.
+  const OFFSET = 100000;
+  await prisma.$transaction([
+    ...orderedEntryIds.map((id, i) => prisma.sessionEntry.update({ where: { id }, data: { order: i + OFFSET } })),
+    ...orderedEntryIds.map((id, i) => prisma.sessionEntry.update({ where: { id }, data: { order: i } })),
+  ]);
 }
 
 /** Upsert a set log (check-off / edit weight·reps·rpe). */

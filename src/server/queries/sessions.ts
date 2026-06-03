@@ -45,3 +45,22 @@ export function completedSetCount(entries: { sets: { completed: boolean; isWarmu
   for (const e of entries) for (const s of e.sets) if (s.completed && !s.isWarmup) n++;
   return n;
 }
+
+export interface UserSessionRow {
+  id: string;
+  userAgent: string | null;
+  label: string | null;
+  lastUsedAt: Date;
+  createdAt: Date;
+  isCurrent: boolean;
+}
+
+/** Active login sessions for a user. Never exposes hashedSecret or ipHash. */
+export async function listUserSessions(userId: string, currentSessionId: string | null): Promise<UserSessionRow[]> {
+  const rows = await prisma.session.findMany({
+    where: { userId },
+    orderBy: { lastUsedAt: 'desc' },
+    select: { id: true, userAgent: true, label: true, lastUsedAt: true, createdAt: true },
+  });
+  return rows.map((r) => ({ ...r, isCurrent: r.id === currentSessionId }));
+}
