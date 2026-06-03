@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { prisma } from '@/server/db/prisma';
-import { awardForWorkout } from './award';
+import { awardForWorkout, awardFriendStreakBonus } from './award';
 import { settleLeagues } from '@/server/jobs/leagueSettle';
 import { runJob } from '@/server/jobs';
 
@@ -70,6 +70,31 @@ d('XP award', () => {
     expect(after.currentStreak).toBe(1); // unchanged
     expect(after.lifetimeXp).toBeGreaterThan(before.lifetimeXp); // sets + workout still awarded
     expect(r.xpAwarded).toBeGreaterThan(0);
+  });
+
+  it('is idempotent: re-awarding the same session adds no XP or ledger rows (W1-T4)', async () => {
+    const s = await completedSession(userId, exerciseId, now, 3);
+    const r1 = await awardForWorkout(userId, s.id, 1, now);
+    expect(r1.xpAwarded).toBeGreaterThan(0);
+    const xpAfter1 = (await prisma.userStats.findUniqueOrThrow({ where: { userId } })).lifetimeXp;
+    const rows1 = await prisma.xpEvent.count({ where: { userId } });
+
+    const r2 = await awardForWorkout(userId, s.id, 1, now); // re-finish / retry
+    expect(r2.xpAwarded).toBe(0);
+    const xpAfter2 = (await prisma.userStats.findUniqueOrThrow({ where: { userId } })).lifetimeXp;
+    const rows2 = await prisma.xpEvent.count({ where: { userId } });
+    expect(xpAfter2).toBe(xpAfter1);
+    expect(rows2).toBe(rows1);
+  });
+
+  it('friend-streak bonus caps at 3/day (W1-T1)', async () => {
+    const u = await makeUser('fsb');
+    const dk = '2026-06-02';
+    for (let i = 0; i < 4; i++) await awardFriendStreakBonus(u.id, dk, now);
+    const events = await prisma.xpEvent.findMany({ where: { userId: u.id, type: 'FRIEND_STREAK_BONUS' } });
+    expect(events.length).toBe(3); // 4th advance awards nothing
+    expect(events.reduce((a, e) => a + e.amount, 0)).toBe(30);
+    await prisma.user.delete({ where: { id: u.id } }).catch(() => {});
   });
 });
 

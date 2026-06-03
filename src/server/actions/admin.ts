@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import type { Role } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { requireRole } from '@/lib/auth/guards';
+import { destroyAllSessions } from '@/lib/auth/session';
 import { canChangeRole, canDeactivate, canInvite, canEditSettings } from '@/lib/auth/adminPolicy';
 import { issueToken } from '@/lib/auth/tokens';
 import { sendMagicLink, verifySmtp } from '@/lib/mail';
@@ -64,6 +65,8 @@ export async function setRoleAction(_prev: AdminState, formData: FormData): Prom
   if (!policy.ok) return { error: policy.reason };
 
   await prisma.user.update({ where: { id: targetId }, data: { role: newRole } });
+  // Rotate sessions on privilege change (W1-T5) — force re-auth under the new role.
+  await destroyAllSessions(targetId);
   await audit({ actorId: actor.id, action: 'user.role.change', targetType: 'User', targetId, metadata: { newRole } });
   revalidatePath('/admin/users');
   return { ok: true, notice: 'Role updated.' };

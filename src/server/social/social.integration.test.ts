@@ -84,4 +84,12 @@ d('social', () => {
     const pair = await prisma.friendStreak.findUnique({ where: { userAId_userBId: { userAId: x, userBId: y } } });
     expect(pair?.count).toBe(1);
   });
+
+  it('advancing a friend streak awards +10 FRIEND_STREAK_BONUS XP and bumps weeklyXp (W1-T1)', async () => {
+    const bonuses = await prisma.xpEvent.findMany({ where: { userId: a, type: 'FRIEND_STREAK_BONUS' } });
+    expect(bonuses.length).toBe(1);
+    expect(bonuses[0]!.amount).toBe(10);
+    const membership = await prisma.leagueMembership.findFirst({ where: { userId: a } });
+    expect(membership?.weeklyXp).toBeGreaterThanOrEqual(10);
+  });
 });

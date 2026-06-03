@@ -5,13 +5,14 @@ import type { TokenType } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { getSettings } from '@/lib/settings';
 import { verifyPassword, hashPassword } from '@/lib/auth/password';
-import { createSession, destroyAllSessions, destroyCurrentSession } from '@/lib/auth/session';
+import { createSession, destroyAllSessions, destroyCurrentSession, destroyOtherSessions, currentSessionId } from '@/lib/auth/session';
 import { getCurrentUser } from '@/lib/auth/guards';
 import { consumeToken, issueToken } from '@/lib/auth/tokens';
 import { audit } from '@/lib/auth/audit';
 import { sendMagicLink } from '@/lib/mail';
 import { getRequestContext } from '@/lib/request';
 import { rateLimit } from '@/lib/ratelimit';
+import { LOGIN_LOCK_THRESHOLD, LOGIN_LOCK_DURATION_MS } from '@/lib/auth/constants';
 import { loginSchema, magicRequestSchema, registerSchema, resetRequestSchema, setPasswordSchema } from '@/lib/validation/auth';
 
 export interface ActionState {
@@ -36,8 +37,11 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   const genericFail: ActionState = { error: 'Invalid email or password.' };
 
   if (!user || !user.passwordHash || user.status === 'DEACTIVATED') return genericFail;
+  // Locked accounts return the SAME generic failure as bad creds — no
+  // enumeration oracle distinguishing a real locked account (W1-T10).
   if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
-    return { error: 'Account temporarily locked. Try again later.' };
+    await audit({ actorId: user.id, action: 'auth.login.locked', ip: ctx.ip });
+    return genericFail;
   }
 
   const ok = await verifyPassword(user.passwordHash, password);
@@ -47,7 +51,7 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
       where: { id: user.id },
       data: {
         failedLoginCount: fails,
-        lockedUntil: fails >= 8 ? new Date(Date.now() + 15 * 60 * 1000) : null,
+        lockedUntil: fails >= LOGIN_LOCK_THRESHOLD ? new Date(Date.now() + LOGIN_LOCK_DURATION_MS) : null,
       },
     });
     await audit({ actorId: user.id, action: 'auth.login.fail', ip: ctx.ip });
@@ -157,13 +161,20 @@ export async function logoutAction(): Promise<void> {
  */
 export async function consumeCallbackAction(type: TokenType, rawToken: string): Promise<{ error?: string }> {
   const ctx = await getRequestContext();
+  // Throttle token consumption per-IP (W1-T8) — brute-force defense beyond entropy.
+  const rl = await rateLimit.auth(`consume:${ctx.ip ?? 'noip'}`);
+  if (!rl.ok) return { error: 'Too many attempts. Try again shortly.' };
   const result = await consumeToken(type, rawToken);
   if (!result) return { error: 'This link is invalid or has expired.' };
   const { userId, payload } = result;
 
   switch (type) {
     case 'LOGIN_LINK': {
-      await prisma.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
+      // Clear any prior password-login lockout on successful magic-link login (W1-T9).
+      await prisma.user.update({
+        where: { id: userId },
+        data: { lastLoginAt: new Date(), failedLoginCount: 0, lockedUntil: null },
+      });
       await createSession(userId, ctx);
       await audit({ actorId: userId, action: 'auth.magic.login', ip: ctx.ip });
       redirect('/app');
@@ -199,10 +210,22 @@ export async function consumeCallbackAction(type: TokenType, rawToken: string): 
     case 'EMAIL_CHANGE': {
       const newEmail = (payload as { newEmail?: string } | null)?.newEmail;
       if (newEmail) {
-        await prisma.user.update({
-          where: { id: userId },
-          data: { email: newEmail, pendingEmail: null, emailVerifiedAt: new Date() },
-        });
+        // Re-check uniqueness at consume time — the target may have been
+        // registered by someone else after the change was requested (W1-T7).
+        const taken = await prisma.user.findFirst({ where: { email: newEmail, NOT: { id: userId } } });
+        if (taken) {
+          await prisma.user.update({ where: { id: userId }, data: { pendingEmail: null } }).catch(() => {});
+          return { error: 'That email is already in use.' };
+        }
+        try {
+          await prisma.user.update({
+            where: { id: userId },
+            data: { email: newEmail, pendingEmail: null, emailVerifiedAt: new Date() },
+          });
+        } catch {
+          // Unique-constraint race between the check and the update.
+          return { error: 'That email is already in use.' };
+        }
       }
       await audit({ actorId: userId, action: 'auth.email.change', ip: ctx.ip });
       redirect('/account?emailChanged=1');
@@ -231,6 +254,11 @@ export async function setPasswordAction(userId: string, formData: FormData): Pro
     where: { id: userId },
     data: { passwordHash: await hashPassword(parsed.data.password), mustChangePassword: false },
   });
+  // Revoke every other session on a password change (W1-T6) — a thief's session
+  // dies the moment the real owner changes the password. Keep the current device.
+  const keep = await currentSessionId();
+  if (keep) await destroyOtherSessions(userId, keep);
+  else await destroyAllSessions(userId);
   await audit({ actorId: userId, action: 'auth.password.set' });
   return { ok: true, notice: 'Password updated.' };
 }

@@ -109,3 +109,17 @@ export async function destroyCurrentSession(): Promise<void> {
 export async function destroyAllSessions(userId: string): Promise<void> {
   await prisma.session.deleteMany({ where: { userId } });
 }
+
+/** Revoke all of a user's sessions except one (keep the current device). */
+export async function destroyOtherSessions(userId: string, keepSessionId: string): Promise<void> {
+  await prisma.session.deleteMany({ where: { userId, id: { not: keepSessionId } } });
+}
+
+/** The current request's session id (from the cookie), or null. */
+export async function currentSessionId(): Promise<string | null> {
+  const store = await cookies();
+  const raw = store.get(SESSION_COOKIE)?.value;
+  if (!raw) return null;
+  const id = raw.split('.')[0];
+  return id || null;
+}

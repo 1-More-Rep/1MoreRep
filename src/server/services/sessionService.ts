@@ -201,6 +201,11 @@ export async function finishSession(
   opts: { saveMode: SaveMode; newRoutineName?: string; bodyweightKg?: number; durationSec?: number; notes?: string } = { saveMode: 'NONE' },
 ): Promise<FinishResult> {
   const s = await ownedSession(sessionId, userId);
+  // Idempotency (W1-T4): finishing an already-COMPLETED session must not
+  // re-award XP/PRs (double-submit, retry, back-button). Short-circuit cleanly.
+  if (s.status === 'COMPLETED') {
+    return { newPrs: [], routineId: s.routineId ?? undefined, award: null };
+  }
   const entries = await prisma.sessionEntry.findMany({ where: { sessionId, isRemoved: false }, orderBy: { order: 'asc' } });
 
   let resultRoutineId: string | undefined;

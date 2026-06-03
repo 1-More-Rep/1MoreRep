@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@/server/db/prisma';
 import { daysBetween } from '@/domain/gamification/xp';
+import { awardFriendStreakBonus } from '@/server/gamification/award';
 import { friendIds } from './friends';
 import { writeActivity } from './activity';
 
@@ -27,12 +28,14 @@ export async function evaluateFriendStreaks(userId: string, dayKey: string, now:
     const pair = await prisma.friendStreak.findUnique({ where: { userAId_userBId: { userAId: a, userBId: b } } });
     if (!pair) {
       await prisma.friendStreak.create({ data: { userAId: a, userBId: b, count: 1, lastDayKey: dayKey, active: true } });
+      await awardFriendStreakBonus(userId, dayKey, now);
       continue;
     }
     if (pair.lastDayKey === dayKey) continue; // already counted today
     const gap = pair.lastDayKey ? daysBetween(pair.lastDayKey, dayKey) : Infinity;
     const count = gap === 1 ? pair.count + 1 : 1;
     await prisma.friendStreak.update({ where: { id: pair.id }, data: { count, lastDayKey: dayKey, active: true } });
+    await awardFriendStreakBonus(userId, dayKey, now);
     if (MILESTONES.has(count)) await writeActivity(userId, 'FRIEND_STREAK', { friendId: fid, count });
   }
 }

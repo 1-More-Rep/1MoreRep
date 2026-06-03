@@ -57,10 +57,33 @@ async function buildPool(userId: string, equipment?: Equipment[]): Promise<PoolE
     }));
 }
 
-async function buildHistory(userId: string) {
+/**
+ * Build the per-exercise history the engine uses for progressive overload.
+ * For each EST_1RM PR, inspect the most recent COMPLETED session's top working
+ * set: if it met/exceeded targetRepHigh at low RIR (rir<=1, or rpe>=8.5 when rir
+ * is null), flag `hitTopRangeLowRir` so the engine applies the +2.5% step.
+ */
+export async function buildHistory(userId: string): Promise<GeneratorInput['history']> {
   const prs = await prisma.personalRecord.findMany({ where: { ownerId: userId, kind: 'EST_1RM' } });
   const history: GeneratorInput['history'] = {};
-  for (const p of prs) history[p.exerciseId] = { est1RM: p.value, hitTopRangeLowRir: false };
+  for (const p of prs) {
+    const lastEntry = await prisma.sessionEntry.findFirst({
+      where: { exerciseId: p.exerciseId, isRemoved: false, session: { ownerId: userId, status: 'COMPLETED' } },
+      orderBy: { session: { completedAt: 'desc' } },
+      include: { sets: true },
+    });
+    let hitTopRangeLowRir = false;
+    if (lastEntry) {
+      const working = lastEntry.sets.filter((s) => s.completed && !s.isWarmup && (s.reps ?? 0) > 0);
+      const top = working.sort((a, b) => (b.weightKg ?? 0) - (a.weightKg ?? 0))[0];
+      if (top) {
+        const metReps = (top.reps ?? 0) >= lastEntry.targetRepHigh;
+        const lowRir = top.rir != null ? top.rir <= 1 : top.rpe != null ? top.rpe >= 8.5 : false;
+        hitTopRangeLowRir = metReps && lowRir;
+      }
+    }
+    history[p.exerciseId] = { est1RM: p.value, hitTopRangeLowRir };
+  }
   return history;
 }
 
@@ -110,13 +133,23 @@ export async function createSessionFromPlan(userId: string, plan: GeneratorPlan,
         create: plan.exercises.map((ex, i) => ({
           exerciseId: ex.exerciseId,
           order: i,
+          supersetGroup: ex.supersetGroup ?? null,
           originRoutineItemId: null,
           targetSets: ex.sets,
           targetRepLow: ex.repLow,
           targetRepHigh: ex.repHigh,
           targetRestSec: ex.restSec,
           targetRpe: ex.rpeTarget,
-          sets: { create: Array.from({ length: ex.sets }, (_, j) => ({ setIndex: j + 1, completed: false })) },
+          targetLoadKg: ex.loadSuggestionKg ?? null,
+          // Pre-fill the suggested working load so the generated session starts
+          // with the progressive-overload weight, not a blank field (W1-T3).
+          sets: {
+            create: Array.from({ length: ex.sets }, (_, j) => ({
+              setIndex: j + 1,
+              completed: false,
+              weightKg: ex.loadSuggestionKg ?? undefined,
+            })),
+          },
         })),
       },
     },

@@ -59,6 +59,13 @@ model User {
   unitSystem  UnitSystem @default(METRIC)
   timezone    String     @default("UTC") // drives tz-correct streak/league day keys
 
+  // Training profile (captured during onboarding) — drives generator defaults.
+  experienceLevel     ExperienceLevel?
+  trainingDaysPerWeek Int?
+  defaultEquipment    Equipment[]      @default([])
+  primaryGoal         Goal?
+  onboardedAt         DateTime? // null until the onboarding wizard is completed
+
   // Public profile surface (leaderboards) — explicit, opt-in.
   isProfilePublic Boolean @default(false)
   publicHandle    String? @unique
@@ -99,6 +106,8 @@ model User {
   progressPhotos   ProgressPhoto[]
   pushSubscriptions PushSubscription[]
   notifPrefs       NotificationPreference?
+  invitesCreated       InviteLink[]
+  leaderboardSnapshots LeaderboardSnapshot[]
 
   @@index([role])
   @@index([status])
@@ -116,6 +125,7 @@ model Session {
   ipHash            String? // HMAC(ip), not raw
   userAgent         String?
   label             String?
+  impersonatorId    String? // set when an admin is impersonating; the real actor's userId
 
   @@index([userId])
   @@index([idleExpiresAt])
@@ -311,6 +321,13 @@ enum Goal {
   GENERAL
 }
 
+/// Mirrors src/domain/generator/types.ts Experience (keep in sync).
+enum ExperienceLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
 enum SessionStatus {
   ACTIVE
   PAUSED
@@ -400,6 +417,7 @@ model SessionEntry {
   targetRepHigh       Int      @default(12)
   targetRestSec       Int      @default(120)
   targetRpe           Float?
+  targetLoadKg        Float? // generator's suggested working load, pre-fills the first set
   isRemoved           Boolean  @default(false) // soft-remove preserves diff intent
   sets                SetLog[]
 
@@ -658,6 +676,7 @@ model PrivacySettings {
   profileVisible     Visibility @default(FRIENDS)
   showWorkouts       Visibility @default(FRIENDS)
   showStats          Visibility @default(FRIENDS)
+  showPhotos         Visibility @default(FRIENDS)
   leaderboardOptIn   Boolean    @default(true)
   activityFeedOptIn  Boolean    @default(true)
   searchableByHandle Boolean    @default(true)
@@ -749,4 +768,47 @@ model NotificationPreference {
   leagueResults    Boolean @default(true)
   quietHoursStart  Int? // 0-23 local hour
   quietHoursEnd    Int?
+}
+
+// ---------------------------------------------------------------------------
+// Leaderboards & invites (P9 completion)
+// ---------------------------------------------------------------------------
+
+enum BoardKind {
+  WEEKLY_XP
+  ALLTIME_XP
+  STREAK
+  VOLUME
+  PR
+}
+
+/// Materialized top-K leaderboard rows, rebuilt by the leaderboard.refresh job.
+/// weekKey = "ALL" for all-time boards; ISO week for WEEKLY_XP / PR boards.
+model LeaderboardSnapshot {
+  id      String    @id @default(cuid())
+  board   BoardKind
+  weekKey String
+  rank    Int
+  userId  String
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  value   Float
+  builtAt DateTime  @default(now())
+
+  @@unique([board, weekKey, rank])
+  @@index([board, weekKey])
+  @@index([userId])
+}
+
+/// Shareable friend-invite link (code in URL). Abuse-guarded by expiry/maxUses.
+model InviteLink {
+  id        String    @id @default(cuid())
+  code      String    @unique
+  creatorId String
+  creator   User      @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  expiresAt DateTime?
+  maxUses   Int?
+  useCount  Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  @@index([creatorId])
 }
