@@ -79,6 +79,9 @@ model User {
   authTokens  AuthToken[]
   auditEvents AuditEvent[] @relation("ActorEvents")
   exercises   Exercise[] // custom exercises owned by this user
+  routines    Routine[]
+  workouts    WorkoutSession[]
+  prs         PersonalRecord[]
 
   @@index([role])
   @@index([status])
@@ -257,6 +260,9 @@ model Exercise {
   source        String           @default("FREE_EXERCISE_DB")
   sourceId      String?          @unique // original dataset id; makes reseed idempotent
   muscleLinks   ExerciseMuscle[]
+  routineItems  RoutineItem[]
+  sessionEntries SessionEntry[]
+  prs           PersonalRecord[]
   createdAt     DateTime         @default(now())
 
   @@index([ownerId])
@@ -275,4 +281,144 @@ model ExerciseMuscle {
 
   @@unique([exerciseId, muscle])
   @@index([muscle])
+}
+
+// ---------------------------------------------------------------------------
+// Workout logging (P5)
+// ---------------------------------------------------------------------------
+
+enum Goal {
+  HYPERTROPHY
+  STRENGTH
+  ENDURANCE
+  GENERAL
+}
+
+enum SessionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ABANDONED
+}
+
+enum PrKind {
+  EST_1RM
+  BEST_WEIGHT
+  BEST_VOLUME_SET
+  BEST_REPS
+  BEST_SESSION_VOLUME
+}
+
+/// A named, reusable workout template (ordered exercises with target schemes).
+model Routine {
+  id                String           @id @default(cuid())
+  ownerId           String
+  owner             User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name              String
+  notes             String?
+  goal              Goal?
+  isArchived        Boolean          @default(false)
+  generatedFromPlan Boolean          @default(false)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  items             RoutineItem[]
+  sessions          WorkoutSession[]
+
+  @@index([ownerId])
+}
+
+model RoutineItem {
+  id            String   @id @default(cuid())
+  routineId     String
+  routine       Routine  @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  exerciseId    String
+  exercise      Exercise @relation(fields: [exerciseId], references: [id])
+  order         Int
+  supersetGroup Int?
+  targetSets    Int      @default(3)
+  targetRepLow  Int      @default(8)
+  targetRepHigh Int      @default(12)
+  targetRestSec Int      @default(120)
+  targetRpe     Float?
+  notes         String?
+
+  @@unique([routineId, order])
+}
+
+/// A workout session — serves both the live (ACTIVE) and historical (COMPLETED)
+/// states. `sourceSnapshot` freezes the source routine's items at start for diffing.
+model WorkoutSession {
+  id             String         @id @default(cuid())
+  ownerId        String
+  owner          User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  routineId      String?
+  routine        Routine?       @relation(fields: [routineId], references: [id], onDelete: SetNull)
+  sourceSnapshot Json?
+  status         SessionStatus  @default(ACTIVE)
+  goal           Goal?
+  name           String?
+  startedAt      DateTime       @default(now())
+  completedAt    DateTime?
+  durationSec    Int?
+  bodyweightKg   Float?
+  notes          String?
+  restTimer      Json?
+  entries        SessionEntry[]
+
+  @@index([ownerId, status])
+  @@index([ownerId, startedAt])
+}
+
+model SessionEntry {
+  id                  String   @id @default(cuid())
+  sessionId           String
+  session             WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exerciseId          String
+  exercise            Exercise @relation(fields: [exerciseId], references: [id])
+  order               Int
+  supersetGroup       Int?
+  originRoutineItemId String? // null = added mid-workout
+  targetSets          Int      @default(3)
+  targetRepLow        Int      @default(8)
+  targetRepHigh       Int      @default(12)
+  targetRestSec       Int      @default(120)
+  targetRpe           Float?
+  isRemoved           Boolean  @default(false) // soft-remove preserves diff intent
+  sets                SetLog[]
+
+  @@unique([sessionId, order])
+  @@index([sessionId])
+}
+
+model SetLog {
+  id          String    @id @default(cuid())
+  entryId     String
+  entry       SessionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  setIndex    Int
+  weightKg    Float?
+  reps        Int?
+  rpe         Float?
+  rir         Int?
+  isWarmup    Boolean   @default(false)
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+
+  @@unique([entryId, setIndex])
+}
+
+model PersonalRecord {
+  id         String   @id @default(cuid())
+  ownerId    String
+  owner      User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+  kind       PrKind
+  value      Float
+  unit       String
+  setLogId   String?
+  sessionId  String?
+  achievedAt DateTime @default(now())
+
+  @@unique([ownerId, exerciseId, kind])
+  @@index([ownerId])
 }

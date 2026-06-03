@@ -1,9 +1,14 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { ensureSuperadmin } from '../../prisma/seed/superadmin';
+import { SUPERADMIN, STORAGE_STATE } from './paths';
 
 /**
- * Ensure a known dev superadmin exists and reset instance settings to a
- * deterministic baseline before the E2E run (authenticated admin tests).
+ * Ensure a known dev superadmin + deterministic settings, then mint a session
+ * directly in the DB and write it as a Playwright storageState. Authed tests
+ * reuse this (no repeated logins -> no auth rate-limit flakiness).
  */
 export default async function globalSetup() {
   const prisma = new PrismaClient();
@@ -14,13 +19,46 @@ export default async function globalSetup() {
       where: { id: 1 },
       data: { allowSelfRegistration: false, requireEmailVerification: true, brandName: '1MoreRep' },
     });
+
+    const user = await prisma.user.findUnique({ where: { email: SUPERADMIN.email } });
+    if (user) {
+      const id = crypto.randomBytes(24).toString('base64url');
+      const secret = crypto.randomBytes(32).toString('base64url');
+      const now = Date.now();
+      await prisma.session.create({
+        data: {
+          id,
+          userId: user.id,
+          hashedSecret: crypto.createHash('sha256').update(secret).digest('hex'),
+          idleExpiresAt: new Date(now + 7 * 864e5),
+          absoluteExpiresAt: new Date(now + 30 * 864e5),
+          label: 'e2e',
+        },
+      });
+      mkdirSync(path.dirname(STORAGE_STATE), { recursive: true });
+      writeFileSync(
+        STORAGE_STATE,
+        JSON.stringify({
+          cookies: [
+            {
+              name: '1mr_session',
+              value: `${id}.${secret}`,
+              domain: 'localhost',
+              path: '/',
+              expires: Math.floor((now + 30 * 864e5) / 1000),
+              httpOnly: true,
+              secure: false,
+              sameSite: 'Lax',
+            },
+          ],
+          origins: [],
+        }),
+      );
+    }
   } catch (e) {
-    // If the DB isn't reachable, authed admin tests will be skipped by their guard.
     // eslint-disable-next-line no-console
     console.warn('[e2e global-setup] DB not ready:', (e as Error).message);
   } finally {
     await prisma.$disconnect();
   }
 }
-
-export const DEV_SUPERADMIN = { email: 'admin@1morerep.local', password: 'devsuperpass123' };

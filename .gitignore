@@ -43,3 +43,6 @@ pnpm-debug.log*
 
 # claude code harness config (local)
 /.claude/
+
+# e2e auth storage state (contains a session secret)
+tests/e2e/.auth/

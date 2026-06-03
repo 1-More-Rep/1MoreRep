@@ -11,7 +11,7 @@ test.describe('P2 auth', () => {
   });
 
   test('protected routes redirect to /login', async ({ page }) => {
-    for (const path of ['/app', '/account/password', '/onboarding']) {
+    for (const path of ['/app', '/admin', '/account/password', '/onboarding']) {
       await page.goto(path);
       await expect(page).toHaveURL(/\/login/);
     }
