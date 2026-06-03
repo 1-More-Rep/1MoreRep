@@ -82,6 +82,8 @@ model User {
   routines    Routine[]
   workouts    WorkoutSession[]
   prs         PersonalRecord[]
+  sorenessReports  SorenessReport[]
+  fatigueSnapshots MuscleFatigueSnapshot[]
 
   @@index([role])
   @@index([status])
@@ -421,4 +423,32 @@ model PersonalRecord {
 
   @@unique([ownerId, exerciseId, kind])
   @@index([ownerId])
+}
+
+// ---------------------------------------------------------------------------
+// Fatigue & recovery (P6)
+// ---------------------------------------------------------------------------
+
+model SorenessReport {
+  id         String   @id @default(cuid())
+  ownerId    String
+  owner      User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  muscle     Muscle
+  severity   Int // 0..10
+  reportedAt DateTime @default(now())
+
+  @@index([ownerId, reportedAt])
+}
+
+/// Derived cache (rebuildable from SetLog + SorenessReport) of per-muscle fatigue.
+model MuscleFatigueSnapshot {
+  id            String   @id @default(cuid())
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  muscle        Muscle
+  fatigue       Float
+  recoveryEtaAt DateTime?
+  computedAt    DateTime @default(now())
+
+  @@unique([ownerId, muscle])
 }

@@ -116,3 +116,11 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* 2D body map: silhouette is decorative; each muscle region owns its full bbox */
+.bodymap-silhouette {
+  pointer-events: none;
+}
+.bodymap-region {
+  pointer-events: bounding-box;
+}

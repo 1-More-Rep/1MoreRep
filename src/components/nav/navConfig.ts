@@ -12,6 +12,7 @@ export const SIDEBAR_NAV: NavItem[] = [
   { id: 'today', label: 'Today', icon: 'home', href: '/app' },
   { id: 'workouts', label: 'Workouts', icon: 'dumbbell', href: '/app/workouts' },
   { id: 'exercises', label: 'Exercises', icon: 'weight', href: '/app/exercises' },
+  { id: 'muscle', label: 'Recovery', icon: 'heart', href: '/app/muscle' },
   { id: 'progress', label: 'Progress', icon: 'chart', href: '/app/progress' },
   { id: 'history', label: 'History', icon: 'history', href: '/app/history' },
   { id: 'social', label: 'Social', icon: 'trophy', href: '/app/social' },
