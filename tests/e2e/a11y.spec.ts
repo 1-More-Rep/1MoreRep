@@ -9,12 +9,8 @@ async function audit(page: import('@playwright/test').Page, url: string) {
   await page.goto(url);
   await page.waitForLoadState('networkidle');
   const results = await new AxeBuilder({ page }).withTags(TAGS).analyze();
-  const serious = results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
-  for (const v of serious) {
-    // eslint-disable-next-line no-console
-    console.log(`[a11y] ${url} ${v.id} (${v.impact}) x${v.nodes.length} :: ${v.nodes[0]?.target?.join(' ')} :: ${v.nodes[0]?.failureSummary?.replace(/\n/g, ' ')}`);
-  }
-  return serious;
+  // Fail the suite on serious/critical only; the assertion message carries the rule ids.
+  return results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
 }
 
 test.describe('P12 accessibility (unauthenticated)', () => {

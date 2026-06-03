@@ -92,7 +92,9 @@ log "Building images (this can take a few minutes)…"
 docker compose build
 
 log "Starting services…"
-BOOT_TS="$(date -u +%Y-%m-%dT%H:%M:%S)"
+# UTC with explicit 'Z' — docker parses a zoneless --since as *local* time, which
+# on a non-UTC host would reach back past this boot and re-print old credentials.
+BOOT_TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 docker compose up -d
 
 log "Waiting for the app to become healthy…"
