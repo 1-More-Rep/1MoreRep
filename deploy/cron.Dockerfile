@@ -14,9 +14,10 @@ RUN apk add --no-cache curl ca-certificates \
   && echo "${SUPERCRONIC_SHA1SUM}  /usr/local/bin/supercronic" | sha1sum -c - \
   && chmod +x /usr/local/bin/supercronic
 
-# Run as an unprivileged user; supercronic needs no root.
-RUN addgroup -g 1001 cron && adduser -u 1001 -G cron -D cron
-USER cron
+# Run as an unprivileged system user; supercronic needs no root. Use -S (system,
+# auto-assigned id) to avoid hard-coded GID/UID collisions with the base image.
+RUN addgroup -S cronjobs && adduser -S -G cronjobs cronjobs
+USER cronjobs
 
 ENTRYPOINT ["/usr/local/bin/supercronic"]
 CMD ["/etc/crontab"]
