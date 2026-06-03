@@ -37,7 +37,10 @@ RUN pnpm prisma generate && pnpm build
 FROM base AS tools
 WORKDIR /tools
 COPY package.json /app/package.json
-RUN node -e "const d=require('/app/package.json').dependencies; require('fs').writeFileSync('package.json', JSON.stringify({name:'tools',private:true,dependencies:{prisma:d.prisma,tsx:d.tsx}},null,2))" \
+# onlyBuiltDependencies approves the install scripts pnpm 9 blocks by default —
+# prisma/@prisma/engines fetch the query engine, esbuild (via tsx) fetches its
+# native binary; without them the CLIs can't run, and pnpm exits non-zero.
+RUN node -e "const p=require('/app/package.json'); require('fs').writeFileSync('package.json', JSON.stringify({name:'tools',private:true,packageManager:p.packageManager,dependencies:{prisma:p.dependencies.prisma,tsx:p.dependencies.tsx},pnpm:{onlyBuiltDependencies:['@prisma/engines','prisma','esbuild']}},null,2))" \
   && pnpm install --prod --node-linker=hoisted --no-frozen-lockfile
 
 # ---- runtime stage ----
@@ -54,20 +57,17 @@ RUN apt-get update \
 WORKDIR /app
 
 # Runtime artifacts only.
-# .next/standalone bundles server.js + the traced runtime node_modules (incl. the
-# generated @prisma/client). static + public are served by it; prisma/ holds the
-# schema, migrations and seed used on boot.
+# .next/standalone bundles server.js + the traced runtime node_modules — which,
+# verified, already includes @prisma/client AND the native query engine
+# (.pnpm/@prisma+client*/node_modules/.prisma/client/libquery_engine-*.so.node)
+# under this project's pnpm layout, so no separate Prisma copy is needed.
+# static + public are served by it; prisma/ holds the schema, migrations and seed.
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/docker-entrypoint.sh ./docker-entrypoint.sh
-
-# Belt-and-braces: ensure the generated Prisma client + query engine are present
-# even if Next's file tracer missed the native engine (a known standalone gotcha).
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build /app/node_modules/@prisma/client ./node_modules/@prisma/client
 
 # CLI tools for the entrypoint (prisma migrate deploy + tsx seed), kept separate
 # from the app's traced node_modules so neither clobbers the other.
