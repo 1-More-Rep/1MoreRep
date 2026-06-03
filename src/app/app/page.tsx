@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth/guards';
 import { getActiveSession, getHistory, sessionVolume } from '@/server/queries/sessions';
-import { Card, Mono, SectionLabel, Btn } from '@/components/ui';
+import { getStatsBundle } from '@/server/queries/gamification';
+import { Card, Mono, SectionLabel, Btn, Ring, Icon } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,9 +13,11 @@ const greeting = () => {
 
 export default async function TodayPage() {
   const user = await requireUser();
-  const [active, history] = await Promise.all([getActiveSession(user.id), getHistory(user.id, 5)]);
-  const weekStart = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const thisWeek = history.filter((s) => s.completedAt && s.completedAt.getTime() > weekStart).length;
+  const [active, history, bundle] = await Promise.all([
+    getActiveSession(user.id),
+    getHistory(user.id, 5),
+    getStatsBundle(user.id),
+  ]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
@@ -45,14 +48,26 @@ export default async function TodayPage() {
         )}
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--gap)' }}>
-        <Card>
-          <Mono style={{ fontSize: 24, fontWeight: 700, display: 'block' }}>{thisWeek}</Mono>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>workouts this week</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--gap)' }}>
+        <Card style={{ padding: 'calc(var(--pad) * .8)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--accent-text)', marginBottom: 8 }}>
+            <Icon name="flame" size={17} stroke={1.9} />
+          </div>
+          <Mono data-testid="streak-count" style={{ fontSize: 20, fontWeight: 700, display: 'block', lineHeight: 1 }}>{bundle.stats.currentStreak}</Mono>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>day streak</div>
         </Card>
-        <Card>
-          <Mono style={{ fontSize: 24, fontWeight: 700, display: 'block' }}>{history.length}</Mono>
-          <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>recent sessions</div>
+        <Card style={{ padding: 'calc(var(--pad) * .8)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--accent-text)', marginBottom: 8 }}>
+            <Icon name="bolt" size={17} stroke={1.9} />
+          </div>
+          <Mono style={{ fontSize: 20, fontWeight: 700, display: 'block', lineHeight: 1 }}>{bundle.weeklyXp}</Mono>
+          <div style={{ fontSize: 11, color: 'var(--text-3)', marginTop: 4 }}>XP this week</div>
+        </Card>
+        <Card style={{ padding: 'calc(var(--pad) * .8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Ring pct={bundle.progress.pct} size={62} stroke={7}>
+            <Mono style={{ fontSize: 16, fontWeight: 700 }}>{bundle.progress.level}</Mono>
+            <span style={{ fontSize: 8.5, color: 'var(--text-3)' }}>level</span>
+          </Ring>
         </Card>
       </div>
 

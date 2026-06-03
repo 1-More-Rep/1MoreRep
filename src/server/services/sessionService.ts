@@ -5,6 +5,7 @@ import { prisma } from '@/server/db/prisma';
 import { AuthorizationError } from '@/lib/auth/guards';
 import { diffSessionVsSnapshot, type LiveEntry, type RoutineDiff, type SnapshotItem } from '@/domain/routine/diff';
 import { applySessionPrs, type NewPr } from './prService';
+import { awardForWorkout, type AwardResult } from '@/server/gamification/award';
 
 export type SaveMode = 'NONE' | 'UPDATE_ROUTINE' | 'NEW_ROUTINE';
 
@@ -187,6 +188,7 @@ function toLiveEntry(e: SessionEntry): LiveEntry {
 export interface FinishResult {
   newPrs: NewPr[];
   routineId?: string;
+  award: AwardResult | null;
 }
 
 /** Finish a session: apply the chosen save mode, complete it, compute PRs. */
@@ -219,7 +221,8 @@ export async function finishSession(
   });
 
   const newPrs = await applySessionPrs(userId, sessionId);
-  return { newPrs, routineId: resultRoutineId };
+  const award = await awardForWorkout(userId, sessionId, newPrs.length).catch(() => null);
+  return { newPrs, routineId: resultRoutineId, award };
 }
 
 async function rebuildRoutineItems(routineId: string, entries: SessionEntry[]): Promise<void> {

@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 
 /** Uppercase, letter-spaced section label (muted). */
 export function SectionLabel({ children, style }: { children: ReactNode; style?: CSSProperties }) {
@@ -20,9 +20,9 @@ export function SectionLabel({ children, style }: { children: ReactNode; style?:
 }
 
 /** Monospace, tabular-figures wrapper — used for every number in the app. */
-export function Mono({ children, style }: { children: ReactNode; style?: CSSProperties }) {
+export function Mono({ children, style, ...rest }: { children: ReactNode } & HTMLAttributes<HTMLSpanElement>) {
   return (
-    <span style={{ fontFamily: 'var(--font-mono)', fontFeatureSettings: '"tnum" 1', ...style }}>
+    <span style={{ fontFamily: 'var(--font-mono)', fontFeatureSettings: '"tnum" 1', ...style }} {...rest}>
       {children}
     </span>
   );

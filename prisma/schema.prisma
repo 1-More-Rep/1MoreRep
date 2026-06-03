@@ -57,6 +57,7 @@ model User {
   displayName String
   avatarKey   String? // object-store key, never a public path
   unitSystem  UnitSystem @default(METRIC)
+  timezone    String     @default("UTC") // drives tz-correct streak/league day keys
 
   // Public profile surface (leaderboards) — explicit, opt-in.
   isProfilePublic Boolean @default(false)
@@ -84,6 +85,10 @@ model User {
   prs         PersonalRecord[]
   sorenessReports  SorenessReport[]
   fatigueSnapshots MuscleFatigueSnapshot[]
+  xpEvents         XpEvent[]
+  stats            UserStats?
+  leagueMemberships LeagueMembership[]
+  notifications    Notification[]
 
   @@index([role])
   @@index([status])
@@ -451,4 +456,136 @@ model MuscleFatigueSnapshot {
   computedAt    DateTime @default(now())
 
   @@unique([ownerId, muscle])
+}
+
+// ---------------------------------------------------------------------------
+// Gamification (P8): XP ledger, stats, leagues, notifications, jobs
+// ---------------------------------------------------------------------------
+
+enum XpEventType {
+  SET
+  PR
+  WORKOUT_COMPLETE
+  STREAK_DAY
+  VOLUME_MILESTONE
+  FRIEND_STREAK_BONUS
+}
+
+enum LeagueOutcome {
+  PROMOTE
+  HOLD
+  RELEGATE
+}
+
+enum CohortStatus {
+  ACTIVE
+  SETTLED
+}
+
+enum NotifKind {
+  STREAK_RISK
+  LEAGUE_RESULT
+  FRIEND_REQUEST
+  FRIEND_PR
+  WEEKLY_RECAP
+  LEVEL_UP
+}
+
+enum JobStatus {
+  RUNNING
+  OK
+  FAILED
+}
+
+/// Append-only XP ledger — the source of truth for all gamification.
+model XpEvent {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       XpEventType
+  amount     Int // capped
+  rawAmount  Int // pre-cap, for auditing anti-cheese
+  workoutId  String?
+  meta       Json?
+  occurredAt DateTime    @default(now())
+  dayKey     String // user-local YYYY-MM-DD
+  weekKey    String // user-local ISO week
+  createdAt  DateTime    @default(now())
+
+  @@index([userId, dayKey])
+  @@index([userId, weekKey])
+  @@index([weekKey])
+}
+
+/// Denormalized rollup (rebuildable from XpEvent + sessions).
+model UserStats {
+  userId        String   @id
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lifetimeXp    Int      @default(0)
+  level         Int      @default(1)
+  currentStreak Int      @default(0)
+  longestStreak Int      @default(0)
+  lastActiveDay String?
+  freezesAvail  Int      @default(0)
+  totalVolume   BigInt   @default(0) // centi-kg
+  totalSessions Int      @default(0)
+  leagueTier    String   @default("BRONZE")
+  updatedAt     DateTime @updatedAt
+
+  @@index([lifetimeXp])
+  @@index([longestStreak])
+}
+
+model LeagueCohort {
+  id        String       @id @default(cuid())
+  tier      String
+  weekKey   String
+  status    CohortStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  members   LeagueMembership[]
+
+  @@index([weekKey, status])
+  @@index([tier, weekKey, status])
+}
+
+model LeagueMembership {
+  id       String         @id @default(cuid())
+  cohortId String
+  cohort   LeagueCohort   @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeklyXp Int            @default(0)
+  rank     Int?
+  outcome  LeagueOutcome?
+
+  @@unique([cohortId, userId])
+  @@index([cohortId, weeklyXp])
+  @@index([userId])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      NotifKind
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// Scheduled-job observability + idempotency lock.
+model JobRun {
+  id         String    @id @default(cuid())
+  job        String
+  periodKey  String
+  status     JobStatus @default(RUNNING)
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  detail     Json?
+
+  @@unique([job, periodKey])
 }

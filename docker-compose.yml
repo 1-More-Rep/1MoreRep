@@ -37,6 +37,7 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      JOB_SECRET: ${JOB_SECRET:-}
     ports:
       - '${APP_PORT:-3000}:3000'
     healthcheck:
@@ -49,6 +50,28 @@ services:
       timeout: 5s
       retries: 12
       start_period: 60s
+
+  # Scheduled-job runner: hits the internal job endpoints hourly. Lightweight
+  # loop (no cron daemon needed); jobs self-gate on time/idempotency.
+  cron:
+    image: alpine:3
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      JOB_SECRET: ${JOB_SECRET:-}
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        apk add --no-cache curl >/dev/null 2>&1
+        echo "[cron] started"
+        while true; do
+          for job in streak.rollover league.settle leaderboard.refresh; do
+            curl -s -m 30 -X POST -H "x-job-secret: $$JOB_SECRET" "http://app:3000/api/internal/jobs/$$job" >/dev/null 2>&1 || true
+          done
+          sleep 3600
+        done
 
 volumes:
   db_data:
