@@ -24,6 +24,8 @@ const UNAUTH_ROUTES = ['/login', '/register', '/reset', '/design', '/offline'];
 
 const AUTH_ROUTES = [
   '/app',
+  '/app/profile',
+  '/app/feedback',
   '/app/exercises',
   '/app/exercises/new',
   '/app/workout/new',

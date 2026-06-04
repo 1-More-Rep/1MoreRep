@@ -109,6 +109,7 @@ model User {
   notifPrefs       NotificationPreference?
   invitesCreated       InviteLink[]
   leaderboardSnapshots LeaderboardSnapshot[]
+  feedback             Feedback[]
 
   @@index([role])
   @@index([status])
@@ -812,4 +813,38 @@ model InviteLink {
   createdAt DateTime  @default(now())
 
   @@index([creatorId])
+}
+
+// ---------------------------------------------------------------------------
+// User feedback — submitted from the profile tab, triaged by admins
+// ---------------------------------------------------------------------------
+
+enum FeedbackCategory {
+  FEATURE
+  BUG
+  IMPROVEMENT
+  QUESTION
+  OTHER
+}
+
+enum FeedbackStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model Feedback {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  FeedbackCategory @default(OTHER)
+  status    FeedbackStatus   @default(OPEN)
+  message   String
+  adminNote String? // optional triage note from the reviewer
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
 }

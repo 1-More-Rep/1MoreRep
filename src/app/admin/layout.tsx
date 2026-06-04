@@ -8,6 +8,7 @@ import { ImpersonationBanner } from '@/components/admin/ImpersonationBanner';
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: 'chart' as const },
   { href: '/admin/users', label: 'Users', icon: 'user' as const },
+  { href: '/admin/feedback', label: 'Feedback', icon: 'heart' as const },
   { href: '/admin/settings', label: 'Settings', icon: 'settings' as const },
   { href: '/admin/audit', label: 'Audit log', icon: 'history' as const },
 ];

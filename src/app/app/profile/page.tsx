@@ -1,15 +1,27 @@
 import Link from 'next/link';
-import { requireUser } from '@/lib/auth/guards';
+import { requireUser, hasRole } from '@/lib/auth/guards';
 import { getStatsBundle } from '@/server/queries/gamification';
-import { Card, Chip, Mono, Ring, SectionLabel, Btn } from '@/components/ui';
+import { openFeedbackCount } from '@/server/queries/feedback';
+import { Card, Chip, Mono, Ring, SectionLabel, Btn, Icon } from '@/components/ui';
+import type { IconName } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 
 const initials = (name: string) => name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 
+const ADMIN_LINKS: { href: string; label: string; icon: IconName }[] = [
+  { href: '/admin', label: 'Dashboard', icon: 'chart' },
+  { href: '/admin/users', label: 'Users', icon: 'user' },
+  { href: '/admin/feedback', label: 'Feedback', icon: 'heart' },
+  { href: '/admin/settings', label: 'Settings', icon: 'settings' },
+  { href: '/admin/audit', label: 'Audit log', icon: 'history' },
+];
+
 export default async function ProfilePage() {
   const user = await requireUser();
   const { stats, progress, tier } = await getStatsBundle(user.id);
+  const isAdmin = hasRole(user, 'ADMIN');
+  const openFeedback = isAdmin ? await openFeedbackCount() : 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
@@ -57,6 +69,33 @@ export default async function ProfilePage() {
       </Card>
 
       <Link href="/app/social" style={{ textDecoration: 'none' }}><Btn kind="soft" full icon="trophy">League &amp; leaderboards</Btn></Link>
+
+      <Btn href="/app/feedback" kind="soft" full icon="heart">Send feedback</Btn>
+
+      {isAdmin && (
+        <Card pad={false}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 'var(--pad) var(--pad) 4px' }}>
+            <SectionLabel>Admin</SectionLabel>
+            <Chip accent style={{ marginLeft: 'auto' }}>{user.role.toLowerCase()}</Chip>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {ADMIN_LINKS.map((l, i) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px var(--pad)', textDecoration: 'none', color: 'var(--text)', borderTop: i ? '1px solid var(--line)' : '1px solid var(--line)', marginTop: i ? 0 : 6 }}
+              >
+                <span style={{ width: 30, height: 30, borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--accent-text)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon name={l.icon} size={16} stroke={1.8} />
+                </span>
+                <span style={{ flex: 1, fontSize: 14.5, fontWeight: 500 }}>{l.label}</span>
+                {l.href === '/admin/feedback' && openFeedback > 0 && <Chip accent>{openFeedback} open</Chip>}
+                <Icon name="chevronR" size={16} stroke={1.8} />
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
