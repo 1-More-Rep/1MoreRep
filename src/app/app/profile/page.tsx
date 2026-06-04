@@ -89,7 +89,7 @@ export default async function ProfilePage() {
                   <Icon name={l.icon} size={16} stroke={1.8} />
                 </span>
                 <span style={{ flex: 1, fontSize: 14.5, fontWeight: 500 }}>{l.label}</span>
-                {l.href === '/admin/feedback' && openFeedback > 0 && <Chip accent>{openFeedback} open</Chip>}
+                {l.href === '/admin/feedback' && openFeedback > 0 && <Chip accent>{openFeedback} to triage</Chip>}
                 <Icon name="chevronR" size={16} stroke={1.8} />
               </Link>
             ))}

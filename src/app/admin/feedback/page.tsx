@@ -13,6 +13,7 @@ export default async function AdminFeedbackPage() {
     category: f.category as FeedbackCategoryT,
     status: f.status as FeedbackStatusT,
     message: f.message,
+    adminNote: f.adminNote,
     createdAt: f.createdAt.toISOString(),
     user: { displayName: f.user.displayName, publicHandle: f.user.publicHandle },
   }));

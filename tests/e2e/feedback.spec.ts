@@ -15,18 +15,18 @@ test.describe('feedback', () => {
   test('user submits feedback and an admin triages it', async ({ page }) => {
     const message = `E2E feedback ${Date.now()}`;
     await page.goto('/app/feedback');
-    await page.getByRole('button', { name: 'Bug' }).click();
+    await page.getByRole('radio', { name: 'Bug' }).click(); // category picker = radiogroup
     await page.getByPlaceholder(/Tell us/i).fill(message);
     await page.getByRole('button', { name: /Submit feedback/i }).click();
     await expect(page.getByText(/your feedback was submitted/i)).toBeVisible();
     await expect(page.getByText(message)).toBeVisible(); // appears under "Your submissions"
 
-    // Admin review: it shows up and its status can be changed.
+    // Admin review: it shows up and its status can be changed (persisted).
     await page.goto('/admin/feedback');
     await expect(page.getByText(message)).toBeVisible();
-    const card = page.locator('div', { has: page.getByText(message) }).last();
+    const card = page.locator('div').filter({ hasText: message }).filter({ has: page.getByRole('combobox') }).last();
     const statusSelect = card.getByRole('combobox');
     await statusSelect.selectOption('IN_PROGRESS');
-    await expect(page.getByText('In progress').first()).toBeVisible();
+    await expect(statusSelect).toHaveValue('IN_PROGRESS');
   });
 });

@@ -41,7 +41,7 @@ export default async function FeedbackPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <Chip>{CATEGORY_LABEL[f.category as FeedbackCategoryT]}</Chip>
                   <span style={{ fontSize: 12, fontWeight: 700, color: STATUS_COLOR[f.status as FeedbackStatusT] }}>{STATUS_LABEL[f.status as FeedbackStatusT]}</span>
-                  <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--text-3)' }}>{f.createdAt.toISOString().slice(0, 10)}</span>
+                  <time dateTime={f.createdAt.toISOString()} style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--text-3)' }}>{f.createdAt.toLocaleDateString()}</time>
                 </div>
                 <p style={{ margin: 0, fontSize: 14, color: 'var(--text-2)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{f.message}</p>
                 {f.adminNote && (
