@@ -105,5 +105,29 @@
     "Advanced": "Advanced",
     "Elite": "Elite",
     "Olympian": "Olympian"
+  },
+  "email": {
+    "ignore": "If you didn't request this, you can safely ignore this email.",
+    "INVITE": { "subject": "You're invited to {brand}", "heading": "Welcome aboard", "body": "An admin invited you to join. Click below to set up your account.", "cta": "Accept invite" },
+    "EMAIL_VERIFY": { "subject": "Verify your email for {brand}", "heading": "Confirm your email", "body": "Confirm this address to finish setting up your account.", "cta": "Verify email" },
+    "LOGIN_LINK": { "subject": "Your {brand} sign-in link", "heading": "Sign in", "body": "Use this link to sign in. It expires in 15 minutes and can be used once.", "cta": "Sign in" },
+    "PASSWORD_RESET": { "subject": "Reset your {brand} password", "heading": "Reset password", "body": "Click below to choose a new password. This link expires in 30 minutes.", "cta": "Reset password" },
+    "EMAIL_CHANGE": { "subject": "Confirm your new email for {brand}", "heading": "Confirm new email", "body": "Confirm this new address to update your account email.", "cta": "Confirm email" },
+    "smtpTestSubject": "{brand} SMTP test",
+    "smtpTestBody": "This is a test email. Your SMTP settings work."
+  },
+  "push": {
+    "workoutReminder": { "title": "Time to train 💪", "body": "You have a workout waiting." },
+    "test": { "title": "{brand}", "body": "Push notifications are working. 🎉" },
+    "streakRisk": { "title": "Keep your streak alive 🔥", "body": "Train today to keep your streak going." },
+    "leagueResults": { "title": "League results are in" }
+  },
+  "notifications": {
+    "friendRequest": { "title": "New friend request", "body": "Someone wants to connect." },
+    "friendAccepted": { "title": "Friend request accepted", "body": "You have a new friend." },
+    "streakReset": { "title": "Streak reset", "body": "Your daily streak reset — start a new one today." },
+    "leaguePromote": { "title": "Promoted! 🎉", "body": "You finished #{rank} and were promoted to {tier}." },
+    "leagueRelegate": { "title": "League result", "body": "You finished #{rank} and were relegated to {tier}." },
+    "leagueHold": { "title": "League result", "body": "You finished #{rank} and held {tier}." }
   }
 }

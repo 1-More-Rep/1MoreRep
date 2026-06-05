@@ -3,8 +3,11 @@ import { prisma } from '@/server/db/prisma';
 import { logger } from '@/lib/logger';
 import { settleCohort, nextTier, type CohortMember, type Tier } from '@/domain/gamification/leagues';
 import { sendToUser } from '@/server/push';
+import { getTranslator } from '@/i18n/translator';
 
 const JOB = 'league.settle';
+
+const LEAGUE_KEY = { PROMOTE: 'leaguePromote', RELEGATE: 'leagueRelegate', HOLD: 'leagueHold' } as const;
 
 /**
  * Settle all ACTIVE cohorts for a week. Idempotent: a completed run (JobRun OK)
@@ -41,18 +44,31 @@ export async function settleLeagues(weekKey: string, now: Date = new Date()): Pr
           prisma.leagueMembership.update({ where: { id: mem.id }, data: { rank: r.rank, outcome: r.outcome } }),
           prisma.userStats.update({ where: { userId: r.userId }, data: { leagueTier: newTier } }),
         ]);
-        const body =
-          r.outcome === 'PROMOTE'
-            ? `You finished #${r.rank} and were promoted to ${newTier.toLowerCase()}.`
-            : r.outcome === 'RELEGATE'
-              ? `You finished #${r.rank} and dropped to ${newTier.toLowerCase()}.`
-              : `You finished #${r.rank} and held ${newTier.toLowerCase()}.`;
+        // Localized to the member's account language + keyed so the in-app feed re-localizes.
+        const key = LEAGUE_KEY[r.outcome];
+        const params = { rank: r.rank, tier: newTier.toLowerCase() };
+        const t = getTranslator(mem.user.locale);
+        const title = t(`notifications.${key}.title` as never) as string;
+        const body = t(`notifications.${key}.body` as never, params as never) as string;
         await prisma.notification.create({
-          data: { userId: r.userId, kind: 'LEAGUE_RESULT', title: `League ${r.outcome.toLowerCase()}`, body, data: { rank: r.rank, outcome: r.outcome, tier: newTier } },
+          data: {
+            userId: r.userId,
+            kind: 'LEAGUE_RESULT',
+            title,
+            body,
+            titleKey: `notifications.${key}.title`,
+            bodyKey: `notifications.${key}.body`,
+            params,
+            data: { rank: r.rank, outcome: r.outcome, tier: newTier },
+          },
         });
         // Web push (best-effort; respects the user's leagueResults pref + quiet hours).
         // Log on failure rather than swallowing — a dead push pipeline should be visible.
-        await sendToUser(r.userId, { title: 'League results are in', body, url: '/app/social/league' }, 'leagueResults').catch((err) => {
+        await sendToUser(
+          r.userId,
+          (tt) => ({ title: tt('push.leagueResults.title' as never) as string, body, url: '/app/social/league' }),
+          'leagueResults',
+        ).catch((err) => {
           logger.warn({ err, userId: r.userId, job: JOB }, '[league.settle] push notification failed');
         });
       }

@@ -4,6 +4,9 @@ import type { TokenType } from '@prisma/client';
 import { getSettings, resolveSmtp } from '@/lib/settings';
 import { logger } from '@/lib/logger';
 import { env } from '@/lib/env';
+import { prisma } from '@/server/db/prisma';
+import { getTranslator } from '@/i18n/translator';
+import { DEFAULT_LOCALE } from '@/i18n/config';
 import { renderMagicLinkEmail } from './templates';
 
 export interface SendResult {
@@ -65,13 +68,24 @@ export async function sendMail(opts: {
   return { delivered: 'smtp' };
 }
 
-/** Send a typed magic-link email. */
-export async function sendMagicLink(type: TokenType, to: string, url: string): Promise<SendResult> {
+/**
+ * Send a typed magic-link email in the recipient's language. When `locale` isn't
+ * given we look up the recipient's account locale by email (covers login/verify/
+ * reset/email-change); register/invite can pass the chosen locale explicitly.
+ */
+export async function sendMagicLink(type: TokenType, to: string, url: string, locale?: string): Promise<SendResult> {
   const settings = await getSettings();
-  const { subject, html, text } = renderMagicLinkEmail(type, url, {
-    brandName: settings.brandName,
-    themeColor: settings.themeColor,
-  });
+  let loc = locale;
+  if (!loc) {
+    const recipient = await prisma.user.findUnique({ where: { email: to.toLowerCase().trim() }, select: { locale: true } }).catch(() => null);
+    loc = recipient?.locale ?? DEFAULT_LOCALE;
+  }
+  const { subject, html, text } = renderMagicLinkEmail(
+    type,
+    url,
+    { brandName: settings.brandName, themeColor: settings.themeColor },
+    loc,
+  );
   return sendMail({ to, subject, html, text });
 }
 
@@ -80,7 +94,7 @@ export async function sendMagicLink(type: TokenType, to: string, url: string): P
  * also delivers a small test email and surfaces any send error; otherwise only
  * the connection is verified.
  */
-export async function verifySmtp(sendTo?: string | null): Promise<{ ok: boolean; sent?: boolean; error?: string }> {
+export async function verifySmtp(sendTo?: string | null, locale?: string): Promise<{ ok: boolean; sent?: boolean; error?: string }> {
   const settings = await getSettings();
   const smtp = resolveSmtp(settings);
   if (!smtp) return { ok: false, error: 'SMTP not configured' };
@@ -101,9 +115,10 @@ export async function verifySmtp(sendTo?: string | null): Promise<{ ok: boolean;
 
     const recipient = sendTo?.trim() || smtp.from;
     if (recipient) {
-      const subject = `${settings.brandName} — SMTP test`;
-      const text = `This is a test email from ${settings.brandName}. If you received it, outgoing mail is working.`;
-      const html = `<p>This is a test email from <strong>${settings.brandName}</strong>. If you received it, outgoing mail is working.</p>`;
+      const tr = getTranslator(locale);
+      const subject = tr('email.smtpTestSubject' as never, { brand: settings.brandName } as never) as string;
+      const text = tr('email.smtpTestBody' as never) as string;
+      const html = `<p>${text}</p>`;
       await t.sendMail({ from: smtp.from, to: recipient, subject, html, text });
       return { ok: true, sent: true };
     }

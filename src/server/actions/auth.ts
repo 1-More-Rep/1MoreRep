@@ -1,8 +1,10 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import type { TokenType } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
+import { isLocale, LOCALE_COOKIE } from '@/i18n/config';
 import { getSettings } from '@/lib/settings';
 import { verifyPassword, hashPassword } from '@/lib/auth/password';
 import { createSession, destroyAllSessions, destroyCurrentSession, destroyOtherSessions, currentSessionId } from '@/lib/auth/session';
@@ -119,6 +121,9 @@ export async function registerAction(_prev: ActionState, formData: FormData): Pr
   if (existing) return { error: 'That email or handle is already taken.' };
 
   const requireVerify = settings.requireEmailVerification;
+  // Capture the language chosen on the auth page (cookie) so the account starts in it.
+  const localeCookie = (await cookies()).get(LOCALE_COOKIE)?.value;
+  const locale = isLocale(localeCookie) ? localeCookie : 'en';
   const user = await prisma.user.create({
     data: {
       email,
@@ -128,6 +133,7 @@ export async function registerAction(_prev: ActionState, formData: FormData): Pr
       role: 'USER',
       status: requireVerify ? 'INVITED' : 'ACTIVE',
       emailVerifiedAt: requireVerify ? null : new Date(),
+      locale,
     },
   });
   await audit({ actorId: user.id, action: 'auth.register', ip: ctx.ip });

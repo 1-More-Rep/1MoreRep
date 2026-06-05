@@ -1,12 +1,29 @@
 import 'server-only';
-import type { FriendStatus } from '@prisma/client';
+import type { FriendStatus, NotifKind } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { AuthorizationError } from '@/lib/auth/guards';
 import { sendToUser } from '@/server/push';
+import { getTranslator } from '@/i18n/translator';
 import { logger } from '@/lib/logger';
 
-/** Best-effort friend-activity web push — never throws into the calling request. */
-function notifyFriendActivity(userId: string, title: string, body: string): void {
+/**
+ * Friend-activity notification in the RECIPIENT's language: best-effort web push,
+ * plus (optionally) a stored Notification row carrying both rendered text and the
+ * i18n key/params so the in-app feed can re-localize for the viewer. Never throws
+ * into the calling request.
+ */
+async function notifyFriend(userId: string, key: 'friendRequest' | 'friendAccepted', createRow?: NotifKind): Promise<void> {
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { locale: true } });
+  const t = getTranslator(u?.locale);
+  const titleKey = `notifications.${key}.title`;
+  const bodyKey = `notifications.${key}.body`;
+  const title = t(titleKey as never) as string;
+  const body = t(bodyKey as never) as string;
+  if (createRow) {
+    await prisma.notification
+      .create({ data: { userId, kind: createRow, title, body, titleKey, bodyKey } })
+      .catch((e) => logger.warn({ err: e, userId }, 'friend notification row failed'));
+  }
   void sendToUser(userId, { title, body, url: '/app/profile/friends', tag: 'friend-activity' }, 'friendActivity').catch((e) => {
     logger.warn({ err: e, userId }, 'friend-activity push failed');
   });
@@ -76,8 +93,7 @@ export async function sendFriendRequest(requesterId: string, handle: string): Pr
     update: { status: 'PENDING', respondedAt: null },
     create: { requesterId, addresseeId: target.id, status: 'PENDING' },
   });
-  await prisma.notification.create({ data: { userId: target.id, kind: 'FRIEND_REQUEST', title: 'New friend request', body: 'Someone wants to connect.' } });
-  notifyFriendActivity(target.id, 'New friend request', 'Someone wants to connect.');
+  await notifyFriend(target.id, 'friendRequest', 'FRIEND_REQUEST');
   return { ok: true };
 }
 
@@ -88,7 +104,7 @@ export async function respondToRequest(userId: string, requesterId: string, acce
     where: { id: req.id },
     data: { status: accept ? 'ACCEPTED' : 'DECLINED', respondedAt: new Date() },
   });
-  if (accept) notifyFriendActivity(requesterId, 'Friend request accepted', 'You have a new friend.');
+  if (accept) void notifyFriend(requesterId, 'friendAccepted');
 }
 
 export async function removeFriend(userId: string, otherId: string): Promise<void> {

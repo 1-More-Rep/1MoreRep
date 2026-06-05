@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth/guards';
 import { prisma } from '@/server/db/prisma';
+import { getSettings } from '@/lib/settings';
 import { saveSubscription, removeSubscription, sendToUser } from '@/server/push';
 
 export interface PushState {
@@ -25,7 +26,12 @@ export async function unsubscribePushAction(endpoint: string): Promise<void> {
 
 export async function sendTestPushAction(): Promise<{ sent: number; reason?: string }> {
   const user = await requireUser();
-  return sendToUser(user.id, { title: '1MoreRep', body: 'Push notifications are working 🎉', url: '/app' });
+  const { brandName } = await getSettings();
+  return sendToUser(user.id, (t) => ({
+    title: t('push.test.title' as never, { brand: brandName } as never) as string,
+    body: t('push.test.body' as never) as string,
+    url: '/app',
+  }));
 }
 
 export async function updateNotifPrefsAction(_prev: PushState, formData: FormData): Promise<PushState> {

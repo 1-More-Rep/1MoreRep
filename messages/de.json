@@ -105,5 +105,29 @@
     "Advanced": "Erfahren",
     "Elite": "Elite",
     "Olympian": "Olympionike"
+  },
+  "email": {
+    "ignore": "Wenn du das nicht angefordert hast, kannst du diese E-Mail ignorieren.",
+    "INVITE": { "subject": "Du wurdest zu {brand} eingeladen", "heading": "Willkommen an Bord", "body": "Ein Admin hat dich eingeladen. Klicke unten, um dein Konto einzurichten.", "cta": "Einladung annehmen" },
+    "EMAIL_VERIFY": { "subject": "Bestätige deine E-Mail für {brand}", "heading": "E-Mail bestätigen", "body": "Bestätige diese Adresse, um die Einrichtung deines Kontos abzuschließen.", "cta": "E-Mail bestätigen" },
+    "LOGIN_LINK": { "subject": "Dein {brand} Anmelde-Link", "heading": "Anmelden", "body": "Nutze diesen Link zum Anmelden. Er läuft in 15 Minuten ab und ist einmal verwendbar.", "cta": "Anmelden" },
+    "PASSWORD_RESET": { "subject": "Setze dein {brand} Passwort zurück", "heading": "Passwort zurücksetzen", "body": "Klicke unten, um ein neues Passwort zu wählen. Dieser Link läuft in 30 Minuten ab.", "cta": "Passwort zurücksetzen" },
+    "EMAIL_CHANGE": { "subject": "Bestätige deine neue E-Mail für {brand}", "heading": "Neue E-Mail bestätigen", "body": "Bestätige diese neue Adresse, um die E-Mail deines Kontos zu aktualisieren.", "cta": "E-Mail bestätigen" },
+    "smtpTestSubject": "{brand} SMTP-Test",
+    "smtpTestBody": "Dies ist eine Test-E-Mail. Deine SMTP-Einstellungen funktionieren."
+  },
+  "push": {
+    "workoutReminder": { "title": "Zeit zu trainieren 💪", "body": "Ein Workout wartet auf dich." },
+    "test": { "title": "{brand}", "body": "Push-Benachrichtigungen funktionieren. 🎉" },
+    "streakRisk": { "title": "Halte deine Streak am Leben 🔥", "body": "Trainiere heute, um deine Streak zu halten." },
+    "leagueResults": { "title": "Die Liga-Ergebnisse sind da" }
+  },
+  "notifications": {
+    "friendRequest": { "title": "Neue Freundschaftsanfrage", "body": "Jemand möchte sich mit dir vernetzen." },
+    "friendAccepted": { "title": "Freundschaftsanfrage angenommen", "body": "Du hast einen neuen Freund." },
+    "streakReset": { "title": "Streak zurückgesetzt", "body": "Deine tägliche Streak wurde zurückgesetzt — starte heute eine neue." },
+    "leaguePromote": { "title": "Aufgestiegen! 🎉", "body": "Du wurdest #{rank} und bist in die Liga {tier} aufgestiegen." },
+    "leagueRelegate": { "title": "Liga-Ergebnis", "body": "Du wurdest #{rank} und bist in die Liga {tier} abgestiegen." },
+    "leagueHold": { "title": "Liga-Ergebnis", "body": "Du wurdest #{rank} und bleibst in {tier}." }
   }
 }

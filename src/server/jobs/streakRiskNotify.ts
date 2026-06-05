@@ -13,7 +13,7 @@ const RISK_HOUR = 20; // 8pm local — fires once/day per user
 export async function streakRiskNotify(now: Date = new Date()): Promise<{ notified: number }> {
   const users = await prisma.user.findMany({
     where: { status: 'ACTIVE', stats: { currentStreak: { gt: 0 } } },
-    select: { id: true, timezone: true, stats: { select: { lastStreakNudgeDay: true } } },
+    select: { id: true, timezone: true, locale: true, stats: { select: { lastStreakNudgeDay: true } } },
   });
 
   let notified = 0;
@@ -35,7 +35,15 @@ export async function streakRiskNotify(now: Date = new Date()): Promise<{ notifi
     // Per-user isolation: one user's push failure must not abort the whole batch and
     // leave everyone after them un-nudged. Log and move on.
     try {
-      const res = await sendToUser(u.id, { title: 'Keep your streak alive 🔥', body: 'Train today to keep your streak going.', url: '/app/workout/new' }, 'streakAtRisk');
+      const res = await sendToUser(
+        u.id,
+        (t) => ({
+          title: t('push.streakRisk.title' as never) as string,
+          body: t('push.streakRisk.body' as never) as string,
+          url: '/app/workout/new',
+        }),
+        'streakAtRisk',
+      );
       // Stamp the marker after a successful (non-throwing) send so a genuine error retries
       // next hour, while a user with simply no subscription isn't re-attempted all evening.
       await prisma.userStats.update({ where: { userId: u.id }, data: { lastStreakNudgeDay: today } });

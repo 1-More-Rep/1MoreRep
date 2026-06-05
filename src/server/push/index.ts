@@ -4,6 +4,10 @@ import type { NotificationPreference } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { localHour } from '@/domain/gamification/xp';
 import { logger } from '@/lib/logger';
+import { getTranslator } from '@/i18n/translator';
+
+/** A translator bound to a recipient's locale (for building localized payloads). */
+export type PushTranslator = ReturnType<typeof getTranslator>;
 
 export function getVapidPublicKey(): string | null {
   return process.env.VAPID_PUBLIC_KEY || null;
@@ -55,26 +59,37 @@ export interface PushPayload {
   tag?: string;
 }
 
-/** Send a push to all of a user's devices, honoring prefs + quiet hours; prunes dead subs. */
-export async function sendToUser(userId: string, payload: PushPayload, prefKey?: keyof NotificationPreference): Promise<{ sent: number; reason?: string }> {
+/**
+ * Send a push to all of a user's devices, honoring prefs + quiet hours; prunes dead subs.
+ * The payload may be a static object OR a builder that receives a translator bound to the
+ * recipient's locale — so notifications render in the user's language, not the sender's.
+ */
+export async function sendToUser(
+  userId: string,
+  payload: PushPayload | ((t: PushTranslator) => PushPayload),
+  prefKey?: keyof NotificationPreference,
+): Promise<{ sent: number; reason?: string }> {
   if (!vapidConfigured()) return { sent: 0, reason: 'vapid-not-configured' };
 
   const prefs = await prisma.notificationPreference.findUnique({ where: { userId } });
   if (prefKey && prefs && prefs[prefKey] === false) return { sent: 0, reason: 'pref-disabled' };
 
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { timezone: true, locale: true } });
+
   if (prefs?.quietHoursStart != null && prefs.quietHoursEnd != null) {
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { timezone: true } });
     if (inQuietHours(localHour(new Date(), user?.timezone || 'UTC'), prefs.quietHoursStart, prefs.quietHoursEnd)) {
       return { sent: 0, reason: 'quiet-hours' };
     }
   }
+
+  const resolved: PushPayload = typeof payload === 'function' ? payload(getTranslator(user?.locale)) : payload;
 
   ensureVapid();
   const subs = await prisma.pushSubscription.findMany({ where: { userId } });
   let sent = 0;
   for (const s of subs) {
     try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { timeout: PUSH_TIMEOUT_MS });
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(resolved), { timeout: PUSH_TIMEOUT_MS });
       await prisma.pushSubscription.update({ where: { id: s.id }, data: { lastSuccessAt: new Date(), failureCount: 0 } });
       sent++;
     } catch (e) {
@@ -97,7 +112,12 @@ export async function sendToUser(userId: string, payload: PushPayload, prefKey?:
 export async function sendWorkoutReminder(userId: string): Promise<{ sent: number; reason?: string }> {
   return sendToUser(
     userId,
-    { title: 'Time to train 💪', body: 'You have a workout waiting. Jump back in.', url: '/app/workout/new', tag: 'workout-reminder' },
+    (t) => ({
+      title: t('push.workoutReminder.title' as never) as string,
+      body: t('push.workoutReminder.body' as never) as string,
+      url: '/app/workout/new',
+      tag: 'workout-reminder',
+    }),
     'workoutReminder',
   );
 }

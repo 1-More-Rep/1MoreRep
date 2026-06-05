@@ -228,7 +228,7 @@ export async function updateLlmAction(_prev: AdminState, formData: FormData): Pr
 
 export async function testSmtpAction(): Promise<AdminState> {
   const actor = await requireRole('SUPERADMIN');
-  const result = await verifySmtp(actor.email);
+  const result = await verifySmtp(actor.email, actor.locale);
   if (!result.ok) return { error: result.error ?? 'SMTP test failed.' };
   return {
     ok: true,
