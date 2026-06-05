@@ -57,3 +57,32 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
     clearTimeout(id);
   }
 }
+
+/**
+ * Probe an Ollama server and return its installed model names (from /api/tags).
+ * Powers the admin "Check connection" flow so the model can be picked from a
+ * dropdown instead of hand-typed. Throws a clear, user-facing error on failure.
+ */
+export async function fetchOllamaModels(baseUrl: string, timeoutMs = 2500): Promise<string[]> {
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(`${baseUrl.replace(/\/$/, '')}/api/tags`, {}, timeoutMs);
+  } catch {
+    throw new Error('Could not reach that URL. Check the host/port and that Ollama is running.');
+  }
+  if (!res.ok) throw new Error(`Ollama responded ${res.status}. Is this an Ollama server?`);
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error('That endpoint did not return JSON — it does not look like an Ollama server.');
+  }
+  const models = (data as { models?: unknown }).models;
+  if (!Array.isArray(models)) {
+    throw new Error('Unexpected response from /api/tags — this does not look like an Ollama server.');
+  }
+  const names = models
+    .map((m) => (m && typeof m === 'object' ? (m as { name?: unknown }).name : undefined))
+    .filter((n): n is string => typeof n === 'string' && n.length > 0);
+  return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
+}

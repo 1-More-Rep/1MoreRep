@@ -19,20 +19,20 @@ export async function addFriendAction(_prev: SocialState, formData: FormData): P
   if (!handle) return { error: 'Enter a handle.' };
   const r = await sendFriendRequest(user.id, handle);
   if (r.error) return { error: r.error };
-  revalidatePath('/app/social/friends');
+  revalidatePath('/app/profile/friends');
   return { notice: 'Friend request sent.' };
 }
 
 export async function respondFriendAction(requesterId: string, accept: boolean): Promise<void> {
   const user = await requireUser();
   await respondToRequest(user.id, requesterId, accept);
-  revalidatePath('/app/social/friends');
+  revalidatePath('/app/profile/friends');
 }
 
 export async function removeFriendAction(otherId: string): Promise<void> {
   const user = await requireUser();
   await removeFriend(user.id, otherId);
-  revalidatePath('/app/social/friends');
+  revalidatePath('/app/profile/friends');
 }
 
 export async function searchUsersAction(q: string) {
@@ -45,14 +45,14 @@ export async function sendRequestByHandleAction(handle: string): Promise<SocialS
   const user = await requireUser();
   const r = await sendFriendRequest(user.id, handle);
   if (r.error) return { error: r.error };
-  revalidatePath('/app/social/friends');
+  revalidatePath('/app/profile/friends');
   return { notice: 'Friend request sent.' };
 }
 
 export async function blockUserActionResult(targetId: string): Promise<SocialState> {
   const user = await requireUser();
   await blockUser(user.id, targetId);
-  revalidatePath('/app/social/friends');
+  revalidatePath('/app/profile/friends');
   return { notice: 'User blocked.' };
 }
 
@@ -68,7 +68,7 @@ export async function acceptInviteAction(code: string): Promise<SocialState> {
   const user = await requireUser();
   const r = await acceptInvite(code, user.id);
   if (r.error) return { error: r.error };
-  revalidatePath('/app/social/friends');
+  revalidatePath('/app/profile/friends');
   return { notice: 'You are now friends!' };
 }
 

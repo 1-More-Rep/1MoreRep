@@ -17,6 +17,26 @@ export async function generateInviteLink(creatorId: string, opts: GenerateOpts =
   return code;
 }
 
+/**
+ * Read-only look at an invite: who created it and whether it's still usable, WITHOUT
+ * accepting it. Lets the join page show a confirm step instead of auto-befriending on
+ * a bare GET (which a link prefetch or accidental visit could otherwise trigger).
+ */
+export async function peekInvite(
+  code: string,
+  viewerId: string,
+): Promise<{ error?: string; creator?: { displayName: string; publicHandle: string | null }; self?: boolean }> {
+  const invite = await prisma.inviteLink.findUnique({
+    where: { code },
+    include: { creator: { select: { displayName: true, publicHandle: true } } },
+  });
+  if (!invite) return { error: 'This invite link is invalid.' };
+  if (invite.expiresAt && invite.expiresAt < new Date()) return { error: 'This invite link has expired.' };
+  if (invite.maxUses != null && invite.useCount >= invite.maxUses) return { error: 'This invite link has been used up.' };
+  if (invite.creatorId === viewerId) return { self: true, creator: invite.creator };
+  return { creator: invite.creator };
+}
+
 /** Accept an invite link: becomes friends with the creator. Idempotent and validated. */
 export async function acceptInvite(code: string, accepterId: string): Promise<{ error?: string; ok?: boolean }> {
   const invite = await prisma.inviteLink.findUnique({ where: { code } });

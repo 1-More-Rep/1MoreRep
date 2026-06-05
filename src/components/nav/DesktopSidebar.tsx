@@ -107,6 +107,40 @@ export function DesktopSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
           </Link>
         )}
         <Link
+          href="/app/profile"
+          aria-current={isActive(pathname, '/app/profile') ? 'page' : undefined}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 11,
+            padding: '10px 12px',
+            borderRadius: 'var(--r-sm)',
+            textDecoration: 'none',
+            fontSize: 14.5,
+            color: 'var(--text-2)',
+          }}
+        >
+          <Icon name="user" size={19} stroke={1.8} />
+          Profile
+        </Link>
+        <Link
+          href="/app/feedback"
+          aria-current={isActive(pathname, '/app/feedback') ? 'page' : undefined}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 11,
+            padding: '10px 12px',
+            borderRadius: 'var(--r-sm)',
+            textDecoration: 'none',
+            fontSize: 14.5,
+            color: 'var(--text-2)',
+          }}
+        >
+          <Icon name="megaphone" size={19} stroke={1.8} />
+          Help &amp; feedback
+        </Link>
+        <Link
           href="/app/settings"
           aria-current={isActive(pathname, '/app/settings') ? 'page' : undefined}
           style={{

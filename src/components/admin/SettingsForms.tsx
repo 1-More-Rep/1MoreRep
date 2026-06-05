@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState, useTransition } from 'react';
 import type { InstanceSettings } from '@prisma/client';
 import {
   updateGeneralSettingsAction,
@@ -9,13 +9,14 @@ import {
   updateBrandingAction,
   testSmtpAction,
   testLlmAction,
+  probeLlmAction,
   type AdminState,
 } from '@/server/actions/admin';
 import { Card } from '@/components/ui/Card';
 import { Btn } from '@/components/ui/Btn';
+import { Select } from '@/components/ui/Field';
 import { SectionLabel } from '@/components/ui/typography';
 import { Alert, TextField } from '@/components/auth/ui';
-import { useState } from 'react';
 
 const empty: AdminState = {};
 const fieldRow: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 };
@@ -91,7 +92,45 @@ export function LlmForm({ s }: { s: InstanceSettings }) {
   const [state, action] = useActionState(updateLlmAction, empty);
   const [test, testAction] = useActionState(async () => testLlmAction(), empty);
   const [provider, setProvider] = useState(s.llmProvider);
+  const [baseUrl, setBaseUrl] = useState(s.llmBaseUrl ?? '');
+  const [model, setModel] = useState(s.llmModel ?? '');
+  // Models discovered by "Check connection". null = not probed yet (free-text fallback).
+  const [models, setModels] = useState<string[] | null>(null);
+  const [probe, setProbe] = useState<AdminState>(empty);
+  const [probing, startProbe] = useTransition();
   const unsupported = provider === 'ANTHROPIC' || provider === 'OPENAI';
+  const isOllama = provider === 'OLLAMA';
+
+  function resetProbe() {
+    setModels(null);
+    setProbe(empty);
+  }
+
+  function checkConnection() {
+    const fd = new FormData();
+    fd.set('llmProvider', provider);
+    fd.set('llmBaseUrl', baseUrl);
+    startProbe(async () => {
+      const res = await probeLlmAction(fd);
+      setProbe(res);
+      if (res.models) {
+        setModels(res.models);
+        // Auto-select the saved model if it's still installed, else the first one.
+        if (res.models.length > 0 && !res.models.includes(model)) setModel(res.models[0]!);
+      }
+    });
+  }
+
+  // When the discovered list is available, build dropdown options (keeping a
+  // previously-saved-but-missing model visible so it isn't silently dropped).
+  const modelOptions =
+    models && models.length > 0
+      ? [
+          ...(model && !models.includes(model) ? [{ value: model, label: `${model} (not installed)` }] : []),
+          ...models.map((m) => ({ value: m, label: m })),
+        ]
+      : [];
+
   return (
     <Card>
       <SectionLabel style={{ marginBottom: 14 }}>Workout generator LLM</SectionLabel>
@@ -101,19 +140,68 @@ export function LlmForm({ s }: { s: InstanceSettings }) {
         <div style={fieldRow}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Provider</span>
-            <select name="llmProvider" value={provider} onChange={(e) => setProvider(e.target.value)} style={selectStyle}>
+            <select
+              name="llmProvider"
+              value={provider}
+              onChange={(e) => {
+                setProvider(e.target.value);
+                resetProbe();
+              }}
+              style={selectStyle}
+            >
               <option value="NONE">None (deterministic only)</option>
               <option value="OLLAMA">Ollama (local)</option>
               <option value="ANTHROPIC" disabled>Anthropic (coming soon)</option>
               <option value="OPENAI" disabled>OpenAI (coming soon)</option>
             </select>
           </label>
-          <TextField label="Base URL" name="llmBaseUrl" defaultValue={s.llmBaseUrl ?? ''} placeholder="http://ollama:11434" />
-          <TextField label="Model" name="llmModel" defaultValue={s.llmModel ?? ''} placeholder="llama3.1" />
+          <TextField
+            label="Base URL"
+            name="llmBaseUrl"
+            value={baseUrl}
+            onChange={(e) => {
+              setBaseUrl(e.target.value);
+              resetProbe();
+            }}
+            placeholder="http://ollama:11434"
+          />
+          {models && models.length > 0 ? (
+            <Select
+              label="Model"
+              name="llmModel"
+              ariaLabel="Model"
+              value={model}
+              onChange={setModel}
+              options={modelOptions}
+              placeholder="Select a model…"
+            />
+          ) : (
+            <TextField
+              label="Model"
+              name="llmModel"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder="llama3.1"
+            />
+          )}
           {provider !== 'NONE' && provider !== 'OLLAMA' && (
             <TextField label="API key" name="llmApiKey" type="password" placeholder={s.llmApiKeyEnc ? '•••••• (unchanged)' : ''} />
           )}
         </div>
+
+        {isOllama && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <Btn type="button" kind="soft" size="sm" icon="repeat" onClick={checkConnection} disabled={probing || !baseUrl}>
+              {probing ? 'Checking…' : 'Check connection'}
+            </Btn>
+            <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
+              Detects installed models so you can pick one instead of typing it.
+            </span>
+          </div>
+        )}
+        {probe.error && <Alert kind="error">{probe.error}</Alert>}
+        {probe.notice && <Alert kind="notice">{probe.notice}</Alert>}
+
         {unsupported && (
           <Alert kind="error">
             This provider isn&apos;t implemented yet — saving will be rejected. Use Ollama or None for now.
@@ -124,7 +212,7 @@ export function LlmForm({ s }: { s: InstanceSettings }) {
       <form action={testAction} style={{ marginTop: 10 }}>
         <Alert kind="error">{test.error}</Alert>
         <Alert kind="notice">{test.notice}</Alert>
-        <Btn type="submit" kind="ghost" size="sm">Test prompt</Btn>
+        <Btn type="submit" kind="ghost" size="sm">Test prompt (saved settings)</Btn>
       </form>
     </Card>
   );

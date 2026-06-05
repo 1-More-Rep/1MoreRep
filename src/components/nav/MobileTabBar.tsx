@@ -54,14 +54,30 @@ export function MobileTabBar() {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: 4,
               padding: '4px 8px',
               width: 56,
+              minHeight: 48, // WCAG 2.5.5 / Apple HIG minimum tap target
               textDecoration: 'none',
               color: active ? 'var(--accent-text)' : 'var(--text-3)',
             }}
           >
-            <Icon name={it.icon} size={22} stroke={active ? 2.1 : 1.8} />
+            <span
+              aria-hidden
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 44,
+                height: 30,
+                borderRadius: 'var(--r-pill)',
+                background: active ? 'var(--accent-soft)' : 'transparent',
+                transition: 'background .15s',
+              }}
+            >
+              <Icon name={it.icon} size={22} stroke={active ? 2.2 : 1.8} />
+            </span>
             <span style={{ fontSize: 10.5, fontWeight: active ? 600 : 500 }}>{it.label}</span>
           </Link>
         );

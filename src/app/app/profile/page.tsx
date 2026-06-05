@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { requireUser, hasRole } from '@/lib/auth/guards';
 import { getStatsBundle } from '@/server/queries/gamification';
 import { openFeedbackCount } from '@/server/queries/feedback';
+import { countPendingRequests } from '@/server/social/friends';
 import { Card, Chip, Mono, Ring, SectionLabel, Btn, Icon } from '@/components/ui';
 import type { IconName } from '@/components/ui';
 
@@ -12,16 +13,70 @@ const initials = (name: string) => name.split(/\s+/).map((p) => p[0]).slice(0, 2
 const ADMIN_LINKS: { href: string; label: string; icon: IconName }[] = [
   { href: '/admin', label: 'Dashboard', icon: 'chart' },
   { href: '/admin/users', label: 'Users', icon: 'user' },
-  { href: '/admin/feedback', label: 'Feedback', icon: 'heart' },
+  { href: '/admin/feedback', label: 'Feedback', icon: 'megaphone' },
   { href: '/admin/settings', label: 'Settings', icon: 'settings' },
   { href: '/admin/audit', label: 'Audit log', icon: 'history' },
 ];
+
+/** A tappable row in the Profile hub menu. */
+function HubRow({
+  href,
+  icon,
+  label,
+  badge,
+  first,
+}: {
+  href: string;
+  icon: IconName;
+  label: string;
+  badge?: number;
+  first?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 13,
+        minHeight: 56,
+        padding: '10px var(--pad)',
+        textDecoration: 'none',
+        color: 'var(--text)',
+        borderTop: first ? 'none' : '1px solid var(--line)',
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 'var(--r-sm)',
+          background: 'var(--surface-2)',
+          color: 'var(--accent-text)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <Icon name={icon} size={18} stroke={1.9} />
+      </span>
+      <span style={{ flex: 1, fontSize: 15, fontWeight: 600 }}>{label}</span>
+      {badge ? <Chip accent>{badge}</Chip> : null}
+      <Icon name="chevronR" size={16} stroke={1.8} style={{ color: 'var(--text-3)' }} />
+    </Link>
+  );
+}
 
 export default async function ProfilePage() {
   const user = await requireUser();
   const { stats, progress, tier } = await getStatsBundle(user.id);
   const isAdmin = hasRole(user, 'ADMIN');
-  const openFeedback = isAdmin ? await openFeedbackCount() : 0;
+  const [openFeedback, pendingFriends] = await Promise.all([
+    isAdmin ? openFeedbackCount() : Promise.resolve(0),
+    countPendingRequests(user.id),
+  ]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
@@ -68,9 +123,13 @@ export default async function ProfilePage() {
         <Mono style={{ fontSize: 22, fontWeight: 700, display: 'block', marginTop: 6 }}>{Math.round(Number(stats.totalVolume) / 100).toLocaleString()} kg·reps</Mono>
       </Card>
 
-      <Link href="/app/social" style={{ textDecoration: 'none' }}><Btn kind="soft" full icon="trophy">League &amp; leaderboards</Btn></Link>
-
-      <Btn href="/app/feedback" kind="soft" full icon="heart">Send feedback</Btn>
+      <Card pad={false}>
+        <HubRow first href="/app/profile/friends" icon="users" label="Friends" badge={pendingFriends || undefined} />
+        <HubRow href="/app/social" icon="trophy" label="League & leaderboards" />
+        <HubRow href="/app/muscle" icon="heart" label="Muscle map" />
+        <HubRow href="/app/feedback" icon="megaphone" label="Help & feedback" />
+        <HubRow href="/app/settings" icon="settings" label="Settings" />
+      </Card>
 
       {isAdmin && (
         <Card pad={false}>

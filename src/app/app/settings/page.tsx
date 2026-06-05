@@ -11,6 +11,7 @@ const SECTIONS: { href: string; icon: IconName; title: string; desc: string }[] 
   { href: '/app/settings/privacy', icon: 'settings', title: 'Privacy', desc: 'Profile, leaderboards, activity' },
   { href: '/app/settings/notifications', icon: 'bolt', title: 'Notifications', desc: 'Reminders and push' },
   { href: '/app/settings/sessions', icon: 'settings', title: 'Sessions & devices', desc: 'Active logins, revoke devices' },
+  { href: '/app/feedback', icon: 'megaphone', title: 'Help & feedback', desc: 'Report a bug or request a feature' },
 ];
 
 export default async function SettingsPage() {

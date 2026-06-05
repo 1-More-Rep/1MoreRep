@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger';
 
 /** Best-effort friend-activity web push — never throws into the calling request. */
 function notifyFriendActivity(userId: string, title: string, body: string): void {
-  void sendToUser(userId, { title, body, url: '/app/social/friends', tag: 'friend-activity' }, 'friendActivity').catch((e) => {
+  void sendToUser(userId, { title, body, url: '/app/profile/friends', tag: 'friend-activity' }, 'friendActivity').catch((e) => {
     logger.warn({ err: e, userId }, 'friend-activity push failed');
   });
 }
@@ -35,13 +35,25 @@ export async function areFriends(a: string, b: string): Promise<boolean> {
 }
 
 export async function searchUsersByHandle(q: string, viewerId: string) {
-  if (q.trim().length < 2) return [];
+  const term = q.trim();
+  if (term.length < 2) return [];
   return prisma.user.findMany({
     where: {
       status: 'ACTIVE',
       id: { not: viewerId },
-      publicHandle: { contains: q.trim(), mode: 'insensitive' },
-      OR: [{ privacy: { is: null } }, { privacy: { searchableByHandle: true } }],
+      // Only return users who can actually be added/viewed (they need a public handle).
+      publicHandle: { not: null },
+      AND: [
+        // Match by handle OR display name so users can find friends by either.
+        {
+          OR: [
+            { publicHandle: { contains: term, mode: 'insensitive' } },
+            { displayName: { contains: term, mode: 'insensitive' } },
+          ],
+        },
+        // Respect the searchable-by-handle privacy opt-out (default on when unset).
+        { OR: [{ privacy: { is: null } }, { privacy: { searchableByHandle: true } }] },
+      ],
       NOT: { OR: [{ blocksMade: { some: { blockedId: viewerId } } }, { blocksReceived: { some: { blockerId: viewerId } } }] },
     },
     select: publicUserSelect,
@@ -109,6 +121,11 @@ export async function listPendingRequests(userId: string) {
     orderBy: { createdAt: 'desc' },
   });
   return rows.map((f) => f.requester);
+}
+
+/** Count of incoming pending friend requests (drives the Profile > Friends badge). */
+export async function countPendingRequests(userId: string): Promise<number> {
+  return prisma.friendship.count({ where: { status: 'PENDING', addresseeId: userId } });
 }
 
 /** Accepted-friend user ids (for activity-feed + leaderboard scoping). */

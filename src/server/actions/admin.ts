@@ -13,6 +13,7 @@ import { sendMagicLink, verifySmtp } from '@/lib/mail';
 import { updateSettings, encryptForStorage } from '@/lib/settings';
 import { saveBrandLogo } from '@/server/services/brandService';
 import { getConfiguredProvider } from '@/server/llm';
+import { fetchOllamaModels } from '@/server/llm/ollama';
 import { audit } from '@/lib/auth/audit';
 import { getRequestContext } from '@/lib/request';
 import { emailSchema } from '@/lib/validation/auth';
@@ -44,6 +45,8 @@ export interface AdminState {
   error?: string;
   ok?: boolean;
   notice?: string;
+  /** Populated by probeLlmAction: model names discovered on the LLM server. */
+  models?: string[];
 }
 
 async function activeSuperadminCount(): Promise<number> {
@@ -248,6 +251,38 @@ export async function testLlmAction(): Promise<AdminState> {
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'LLM test failed.' };
   }
+}
+
+/**
+ * Lightweight "Check connection" for the LLM admin form. Probes the UNSAVED form
+ * values (so you can test before saving) and, for Ollama, returns the list of
+ * installed models to populate the model dropdown. SSRF posture matches
+ * updateLlmAction: superadmin-only, http(s)-scheme-only, short timeout. Private/
+ * localhost hosts are intentionally allowed (self-hosted Ollama lives there).
+ */
+export async function probeLlmAction(formData: FormData): Promise<AdminState> {
+  await requireRole('SUPERADMIN');
+  const provider = String(formData.get('llmProvider') ?? 'NONE');
+  const baseUrl = String(formData.get('llmBaseUrl') ?? '').trim();
+
+  if (provider === 'OLLAMA') {
+    if (!baseUrl) return { error: 'Enter the Ollama base URL first.' };
+    if (!isHttpUrl(baseUrl)) return { error: 'Base URL must be a valid http(s) URL.' };
+    try {
+      const models = await fetchOllamaModels(baseUrl, 2500);
+      if (models.length === 0) {
+        return { ok: true, notice: 'Connected, but no models are installed. Run e.g. `ollama pull llama3.1`.', models: [] };
+      }
+      return { ok: true, notice: `Connected — found ${models.length} model${models.length === 1 ? '' : 's'}.`, models };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : 'Could not reach the Ollama server.' };
+    }
+  }
+
+  if (provider === 'ANTHROPIC' || provider === 'OPENAI') {
+    return { error: `${provider} isn’t available yet. Choose Ollama to auto-detect models.` };
+  }
+  return { error: 'Select the Ollama provider to check the connection.' };
 }
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;

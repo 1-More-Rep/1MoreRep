@@ -50,7 +50,14 @@
   z-index: 20;
 }
 
-/* Desktop: show sidebar, hide tab bar */
+/* Mobile-only slim top header (wordmark + More menu). Sticky so it stays in reach. */
+.mobileHeader {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+/* Desktop: show sidebar, hide mobile header + tab bar */
 @media (min-width: 880px) {
   .sidebar {
     display: block;
@@ -60,7 +67,8 @@
     height: 100vh;
     height: 100dvh;
   }
-  .tabbar {
+  .tabbar,
+  .mobileHeader {
     display: none;
   }
   .content {

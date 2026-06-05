@@ -17,7 +17,10 @@ export function FeedbackForm() {
 
   // Clear the message on a successful submit.
   useEffect(() => {
-    if (state.notice) setMessage('');
+    if (state.notice) {
+      setMessage('');
+      setCategory('FEATURE');
+    }
   }, [state.notice]);
 
   // Roving arrow-key navigation for the category radiogroup (ARIA APG Radio pattern).
