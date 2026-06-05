@@ -184,6 +184,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 .nav-cta .signin:hover { color: var(--brand-on-tint); }
 
 .menu-btn { display: none; }
+.mobile-menu { display: none; }   /* hidden on desktop; the 680px query shows it when toggled */
 
 /* ---------- Hero ---------- */
 .hero { position: relative; padding: 64px 0 60px; overflow: hidden; }
