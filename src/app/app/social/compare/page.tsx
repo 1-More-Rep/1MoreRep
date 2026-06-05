@@ -6,6 +6,7 @@ import { getPrivacy, canView } from '@/server/social/privacy';
 import { areFriends, listFriends } from '@/server/social/friends';
 import { getStatsBundle } from '@/server/queries/gamification';
 import { Card, Icon, Mono, SectionLabel } from '@/components/ui';
+import { weightUnit, kgToLb, type UnitSystemLike } from '@/domain/units';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,13 +17,24 @@ interface Metric {
   value: (b: Awaited<ReturnType<typeof getStatsBundle>>) => number;
 }
 
-const METRICS: Metric[] = [
-  { label: 'Lifetime XP', format: (n) => n.toLocaleString(), value: (b) => b.stats.lifetimeXp },
-  { label: 'Level', format: (n) => String(n), value: (b) => b.progress.level },
-  { label: 'Current streak', format: (n) => `${n} day${n === 1 ? '' : 's'}`, value: (b) => b.stats.currentStreak },
-  { label: 'Weekly XP', format: (n) => n.toLocaleString(), value: (b) => b.weeklyXp },
-  { label: 'Total volume', format: (n) => `${Math.round(n).toLocaleString()} kg`, value: (b) => Number(b.stats.totalVolume) / 100 },
-];
+// Total volume is stored in kg; render it in the VIEWER's unit so both sides of the
+// comparison use the same unit (converting both preserves the leader ordering).
+function buildMetrics(system: UnitSystemLike): Metric[] {
+  return [
+    { label: 'Lifetime XP', format: (n) => n.toLocaleString(), value: (b) => b.stats.lifetimeXp },
+    { label: 'Level', format: (n) => String(n), value: (b) => b.progress.level },
+    { label: 'Current streak', format: (n) => `${n} day${n === 1 ? '' : 's'}`, value: (b) => b.stats.currentStreak },
+    { label: 'Weekly XP', format: (n) => n.toLocaleString(), value: (b) => b.weeklyXp },
+    {
+      label: 'Total volume',
+      format: (n) => `${Math.round(n).toLocaleString()} ${weightUnit(system)}`,
+      value: (b) => {
+        const kgReps = Number(b.stats.totalVolume) / 100;
+        return system === 'IMPERIAL' ? kgToLb(kgReps) : kgReps;
+      },
+    },
+  ];
+}
 
 function EmptyState({ message }: { message: string }) {
   return (
@@ -81,6 +93,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
   }
 
   const [me, them] = await Promise.all([getStatsBundle(viewer.id), getStatsBundle(friend.id)]);
+  const METRICS = buildMetrics(viewer.unitSystem);
   const myName = viewer.publicHandle ? `@${viewer.publicHandle}` : viewer.displayName;
   const theirName = friend.publicHandle ? `@${friend.publicHandle}` : friend.displayName;
 

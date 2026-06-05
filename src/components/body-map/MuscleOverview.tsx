@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import type { Muscle } from '@prisma/client';
 import { MUSCLE_LABEL } from '@/domain/muscles/taxonomy';
 import type { Landmark } from '@/domain/generator/landmarks';
@@ -79,6 +79,12 @@ export function MuscleOverview({ data, topExercises }: { data: Record<Muscle, Mu
 
   const info = selected ? data[selected] : null;
 
+  // When a muscle is picked (often via the SVG body map), move focus to the detail panel so
+  // keyboard/AT users land on the newly-revealed content instead of it appearing silently.
+  useEffect(() => {
+    if (selected) document.getElementById('muscle-detail-card')?.focus();
+  }, [selected]);
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: 'var(--gap)' }}>
       <Card>
@@ -86,7 +92,7 @@ export function MuscleOverview({ data, topExercises }: { data: Record<Muscle, Mu
       </Card>
 
       {selected && info ? (
-        <Card data-testid="muscle-detail">
+        <Card data-testid="muscle-detail" id="muscle-detail-card" tabIndex={-1} role="region" aria-live="polite" aria-label="Selected muscle detail" style={{ outline: 'none' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <SectionLabel>Selected muscle</SectionLabel>

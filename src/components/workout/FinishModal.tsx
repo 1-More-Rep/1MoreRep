@@ -24,6 +24,7 @@ export function FinishModal({
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState(defaultName);
   const [notes, setNotes] = useState('');
+  const [err, setErr] = useState<string | null>(null);
   const [pending, startTx] = useTransition();
   const sheetRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -78,7 +79,16 @@ export function FinishModal({
   }, []);
 
   function finish(saveMode: SaveMode) {
-    startTx(() => finishWorkoutAction(sessionId, { saveMode, newRoutineName: name, durationSec, notes: notes.trim() || undefined }));
+    setErr(null);
+    startTx(async () => {
+      try {
+        // On success this server action redirects, which resolves the client promise via
+        // navigation (no throw here); a real failure rejects and is surfaced below.
+        await finishWorkoutAction(sessionId, { saveMode, newRoutineName: name, durationSec, notes: notes.trim() || undefined });
+      } catch {
+        setErr('Couldn’t finish your workout — check your connection and try again. Your sets are still saved.');
+      }
+    });
   }
 
   const dirty = diff?.isDirty ?? false;
@@ -131,6 +141,12 @@ export function FinishModal({
           </label>
         )}
 
+        {err && (
+          <div role="alert" style={{ marginTop: 12, fontSize: 13, color: '#c0392b', lineHeight: 1.4 }}>
+            {err}
+          </div>
+        )}
+
         <button onClick={onClose} disabled={pending} style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 13, cursor: 'pointer', width: '100%' }}>
           Keep training
         </button>
@@ -171,6 +187,10 @@ const sheet: React.CSSProperties = {
   padding: 'calc(var(--pad) * 1.2)',
   width: '100%',
   maxWidth: 440,
+  // Cap height + scroll so the diff-review variant (summary + 3 buttons + notes) never
+  // overflows the overlay and clips its content/actions on short viewports (e.g. iPhone SE).
+  maxHeight: 'calc(100dvh - 32px)',
+  overflowY: 'auto',
   marginBottom: 'env(safe-area-inset-bottom, 0)',
 };
 const input: React.CSSProperties = {

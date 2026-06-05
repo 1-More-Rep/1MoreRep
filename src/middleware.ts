@@ -8,6 +8,11 @@ export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // --- Same-origin enforcement for mutating requests (CSRF defense-in-depth) ---
+  // Note: a missing Origin header is intentionally allowed through. The primary CSRF defenses
+  // are independent of this check (Next.js server actions require the un-forgeable Next-Action
+  // header; the session cookie is SameSite=Lax), and the one real POST API route
+  // (/api/internal/jobs) is authenticated by a JOB_SECRET header and is called by the cron
+  // sidecar WITHOUT an Origin — so a blanket "reject when Origin absent" would break jobs.
   if (MUTATING.has(req.method)) {
     const origin = req.headers.get('origin');
     if (origin) {

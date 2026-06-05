@@ -18,6 +18,7 @@ import { Chip } from '@/components/ui/Chip';
 import { Icon, IconTile, type IconName } from '@/components/ui/Icon';
 import { Mono, SectionLabel } from '@/components/ui/typography';
 import { platesPerSide } from '@/domain/progression/plates';
+import { weightUnit, toKg, weightInputValue, type UnitSystemLike } from '@/domain/units';
 import { FinishModal } from './FinishModal';
 
 export interface ActiveSessionData {
@@ -49,14 +50,30 @@ function notifyRestDone() {
     .catch(() => {});
 }
 
-export function ActiveWorkout({ session }: { session: ActiveSessionData }) {
+export function ActiveWorkout({ session, unitSystem }: { session: ActiveSessionData; unitSystem: UnitSystemLike }) {
   const [entries, setEntries] = useState<UIEntry[]>(session.entries);
+  const wUnit = weightUnit(unitSystem);
   const [, startTx] = useTransition();
   const [elapsed, setElapsed] = useState(Math.floor((Date.now() - session.startedAtMs) / 1000));
   const [rest, setRest] = useState<{ ends: number; total: number } | null>(null);
   const [restLeft, setRestLeft] = useState(0);
   const [finishOpen, setFinishOpen] = useState(false);
   const [plateOpen, setPlateOpen] = useState(false);
+  const [syncErr, setSyncErr] = useState<string | null>(null);
+
+  // Wrap every optimistic mutation: on failure the local state has already diverged from
+  // the server, so surface a visible, recoverable error (refresh re-syncs) instead of
+  // silently dropping the change.
+  function run(fn: () => Promise<unknown>) {
+    startTx(async () => {
+      try {
+        await fn();
+        setSyncErr(null);
+      } catch {
+        setSyncErr('Couldn’t save your last change — check your connection, then refresh to re-sync.');
+      }
+    });
+  }
 
   useEffect(() => {
     const id = setInterval(() => setElapsed(Math.floor((Date.now() - session.startedAtMs) / 1000)), 1000);
@@ -89,34 +106,42 @@ export function ActiveWorkout({ session }: { session: ActiveSessionData }) {
     const set = entry.sets.find((s) => s.setIndex === setIndex)!;
     const completed = !set.completed;
     patchSet(entry.id, setIndex, { completed });
-    startTx(() => logSetAction(entry.id, setIndex, { completed, weightKg: set.weightKg, reps: set.reps }));
+    // Send only `completed`: weight/reps are persisted by commitField on blur, which fires
+    // before this click. Re-sending them here would write the STALE closure values captured
+    // at render time (before the just-typed value reached state), overwriting the real input.
+    run(() => logSetAction(entry.id, setIndex, { completed }));
     if (completed) setRest({ ends: Date.now() + entry.targetRestSec * 1000, total: entry.targetRestSec });
   }
 
   function commitField(entry: UIEntry, setIndex: number, field: 'weightKg' | 'reps' | 'rpe', value: number | null) {
     patchSet(entry.id, setIndex, { [field]: value } as Partial<UIEntry['sets'][number]>);
-    startTx(() => logSetAction(entry.id, setIndex, { [field]: value }));
+    run(() => logSetAction(entry.id, setIndex, { [field]: value }));
   }
 
   function addSetRow(entry: UIEntry) {
     const nextIdx = (entry.sets.at(-1)?.setIndex ?? 0) + 1;
     setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, sets: [...e.sets, { setIndex: nextIdx, weightKg: null, reps: null, rpe: null, isWarmup: false, completed: false }] } : e)));
-    startTx(() => addSetAction(entry.id));
+    run(() => addSetAction(entry.id));
   }
 
   function removeSetRow(entry: UIEntry, setIndex: number) {
     setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, sets: e.sets.filter((s) => s.setIndex !== setIndex) } : e)));
-    startTx(() => deleteSetAction(entry.id, setIndex));
+    run(() => deleteSetAction(entry.id, setIndex));
   }
 
   function removeExercise(entry: UIEntry) {
     setEntries((prev) => prev.filter((e) => e.id !== entry.id));
-    startTx(() => removeEntryAction(entry.id));
+    run(() => removeEntryAction(entry.id));
   }
 
   async function addExercise(exerciseId: string) {
-    const created = await addExerciseAction(session.id, exerciseId);
-    setEntries((prev) => [...prev, created]);
+    try {
+      const created = await addExerciseAction(session.id, exerciseId);
+      setEntries((prev) => [...prev, created]);
+      setSyncErr(null);
+    } catch {
+      setSyncErr('Couldn’t add that exercise — check your connection and try again.');
+    }
   }
 
   function move(index: number, dir: -1 | 1) {
@@ -125,14 +150,14 @@ export function ActiveWorkout({ session }: { session: ActiveSessionData }) {
     const next = [...entries];
     [next[index], next[j]] = [next[j]!, next[index]!];
     setEntries(next);
-    startTx(() => reorderEntriesAction(session.id, next.map((e) => e.id)));
+    run(() => reorderEntriesAction(session.id, next.map((e) => e.id)));
   }
 
   function toggleSuperset(index: number) {
     const entry = entries[index]!;
     if (entry.supersetGroup != null) {
       setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, supersetGroup: null } : e)));
-      startTx(() => updateTargetsAction(entry.id, { supersetGroup: null }));
+      run(() => updateTargetsAction(entry.id, { supersetGroup: null }));
       return;
     }
     const partnerIdx = index < entries.length - 1 ? index + 1 : index - 1;
@@ -140,7 +165,7 @@ export function ActiveWorkout({ session }: { session: ActiveSessionData }) {
     const partner = entries[partnerIdx]!;
     const group = partner.supersetGroup ?? Math.max(0, ...entries.map((e) => e.supersetGroup ?? 0)) + 1;
     setEntries((prev) => prev.map((e) => (e.id === entry.id || e.id === partner.id ? { ...e, supersetGroup: group } : e)));
-    startTx(async () => {
+    run(async () => {
       await updateTargetsAction(entry.id, { supersetGroup: group });
       await updateTargetsAction(partner.id, { supersetGroup: group });
     });
@@ -166,6 +191,17 @@ export function ActiveWorkout({ session }: { session: ActiveSessionData }) {
         </div>
         {plateOpen && <PlateCalc />}
       </Card>
+
+      {/* sync error — a server action failed; local state has diverged, offer a re-sync */}
+      {syncErr && (
+        <Card style={{ borderColor: 'color-mix(in oklab, #d23b3b 30%, var(--surface))' }}>
+          <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: '#c0392b' }}>
+            <Icon name="x" size={16} />
+            <span style={{ flex: 1 }}>{syncErr}</span>
+            <Btn kind="ghost" size="sm" onClick={() => window.location.reload()}>Refresh</Btn>
+          </div>
+        </Card>
+      )}
 
       {/* rest timer */}
       {rest && (
@@ -222,12 +258,14 @@ export function ActiveWorkout({ session }: { session: ActiveSessionData }) {
           </div>
           <div style={{ borderTop: '1px solid var(--line)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 52px 44px', gap: 8, padding: '8px var(--pad)', fontSize: 10.5, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-              <span>Set</span><span>kg</span><span>reps</span><span>RPE</span><span></span>
+              <span>Set</span><span>{wUnit}</span><span>reps</span><span>RPE</span><span></span>
             </div>
             {entry.sets.map((s) => (
               <div key={s.setIndex} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 52px 44px', gap: 8, padding: '6px var(--pad)', alignItems: 'center', borderTop: '1px solid var(--line)', opacity: s.completed ? 0.7 : 1 }}>
                 <Mono style={{ fontSize: 13, color: 'var(--text-3)' }}>{s.setIndex}</Mono>
-                <input type="number" inputMode="decimal" aria-label={`weight set ${s.setIndex}`} defaultValue={s.weightKg ?? ''} onBlur={(e) => commitField(entry, s.setIndex, 'weightKg', e.target.value === '' ? null : Number(e.target.value))} style={cell} />
+                {/* Input shows + accepts the user's unit (lb for IMPERIAL); toKg converts back
+                    to canonical kg on commit so storage is always kg. */}
+                <input type="number" inputMode="decimal" aria-label={`weight set ${s.setIndex} (${wUnit})`} defaultValue={weightInputValue(s.weightKg, unitSystem)} onBlur={(e) => commitField(entry, s.setIndex, 'weightKg', e.target.value === '' ? null : toKg(Number(e.target.value), unitSystem))} style={cell} />
                 <input type="number" inputMode="numeric" aria-label={`reps set ${s.setIndex}`} defaultValue={s.reps ?? ''} onBlur={(e) => commitField(entry, s.setIndex, 'reps', e.target.value === '' ? null : Number(e.target.value))} style={cell} />
                 <input type="number" inputMode="decimal" aria-label={`rpe set ${s.setIndex}`} defaultValue={s.rpe ?? ''} onBlur={(e) => commitField(entry, s.setIndex, 'rpe', e.target.value === '' ? null : Number(e.target.value))} style={{ ...cell, fontSize: 12 }} />
                 <button onClick={() => toggleComplete(entry, s.setIndex)} aria-label={`complete set ${s.setIndex}`} aria-pressed={s.completed} style={{ width: 30, height: 30, borderRadius: 'var(--r-xs)', border: `1.6px solid ${s.completed ? 'var(--accent)' : 'var(--line-2)'}`, background: s.completed ? 'var(--accent)' : 'transparent', color: 'var(--on-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', justifySelf: 'center' }}>

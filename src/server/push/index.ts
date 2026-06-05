@@ -13,10 +13,19 @@ function vapidConfigured(): boolean {
   return !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 }
 
+// Socket timeout for a single push send. Without it a stalled FCM/APNS gateway would
+// hang the per-subscription loop indefinitely (web-push has no default timeout).
+const PUSH_TIMEOUT_MS = 10_000;
+
 let vapidSet = false;
 function ensureVapid() {
   if (vapidSet) return;
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@example.com', process.env.VAPID_PUBLIC_KEY!, process.env.VAPID_PRIVATE_KEY!);
+  // Read into locals + guard instead of non-null asserting undeclared env vars: if either
+  // key is missing we simply don't configure (callers already gate on vapidConfigured()).
+  const pub = process.env.VAPID_PUBLIC_KEY;
+  const priv = process.env.VAPID_PRIVATE_KEY;
+  if (!pub || !priv) return;
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@example.com', pub, priv);
   vapidSet = true;
 }
 
@@ -65,7 +74,7 @@ export async function sendToUser(userId: string, payload: PushPayload, prefKey?:
   let sent = 0;
   for (const s of subs) {
     try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload));
+      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload), { timeout: PUSH_TIMEOUT_MS });
       await prisma.pushSubscription.update({ where: { id: s.id }, data: { lastSuccessAt: new Date(), failureCount: 0 } });
       sent++;
     } catch (e) {

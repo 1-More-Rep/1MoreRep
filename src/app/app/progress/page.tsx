@@ -7,6 +7,7 @@ import { Card, Chip, Icon, SectionLabel } from '@/components/ui';
 import { type ChartPoint } from '@/components/charts/LineChart';
 import { BodyMetricForm } from '@/components/progress/BodyMetricForm';
 import { ProgressTabs, type MeasurementSeries } from '@/components/progress/ProgressTabs';
+import { kgToLb, cmToIn, weightUnit, lengthUnit } from '@/domain/units';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,20 +30,25 @@ export default async function ProgressPage() {
     getTopExerciseId(user.id),
   ]);
 
+  // All stored weights are canonical kg / cm — convert to the user's unit for display.
+  const sys = user.unitSystem;
+  const w = (kg: number) => (sys === 'IMPERIAL' ? kgToLb(kg) : kg); // also scales weight·reps volume
+  const len = (cm: number) => (sys === 'IMPERIAL' ? cmToIn(cm) : cm);
+
   const bodyweight: ChartPoint[] = metrics
     .filter((m) => m.bodyweightKg != null)
-    .map((m) => ({ label: short(m.recordedAt), value: round1(m.bodyweightKg ?? 0) }));
+    .map((m) => ({ label: short(m.recordedAt), value: round1(w(m.bodyweightKg ?? 0)) }));
 
   const volume: ChartPoint[] = [...history]
     .reverse()
     .filter((s) => s.completedAt)
-    .map((s) => ({ label: short(s.completedAt!), value: sessionVolume(s.entries) }));
+    .map((s) => ({ label: short(s.completedAt!), value: round1(w(sessionVolume(s.entries))) }));
 
   // 1RM tab: est-1RM trend for the user's most-trained exercise.
   let oneRm: { exerciseName: string | null; points: ChartPoint[] } = { exerciseName: null, points: [] };
   if (topExerciseId) {
     const [ex, hist] = await Promise.all([getExercise(topExerciseId, user.id), getExerciseSetHistory(topExerciseId, user.id)]);
-    oneRm = { exerciseName: ex?.name ?? null, points: hist.map((p) => ({ label: short(p.at), value: p.est1RM })) };
+    oneRm = { exerciseName: ex?.name ?? null, points: hist.map((p) => ({ label: short(p.at), value: round1(w(p.est1RM)) })) };
   }
 
   // Measurements tab: one series per metric from the BodyMetric.measurements JSON.
@@ -52,7 +58,7 @@ export default async function ProgressPage() {
       const meas = (m.measurements ?? null) as Record<string, unknown> | null;
       const raw = meas?.[key];
       const value = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
-      if (Number.isFinite(value)) points.push({ label: short(m.recordedAt), value: round1(value) });
+      if (Number.isFinite(value)) points.push({ label: short(m.recordedAt), value: round1(len(value)) });
     }
     return { key, label, points };
   }).filter((s) => s.points.length > 0);
@@ -68,12 +74,12 @@ export default async function ProgressPage() {
       </div>
 
       <Card>
-        <ProgressTabs volume={volume} bodyweight={bodyweight} oneRm={oneRm} measurements={measurements} />
+        <ProgressTabs volume={volume} bodyweight={bodyweight} oneRm={oneRm} measurements={measurements} weightUnit={weightUnit(sys)} lengthUnit={lengthUnit(sys)} />
       </Card>
 
       <Card>
         <SectionLabel style={{ marginBottom: 14 }}>Log body metrics</SectionLabel>
-        <BodyMetricForm />
+        <BodyMetricForm unitSystem={sys} />
       </Card>
     </div>
   );

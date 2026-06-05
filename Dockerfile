@@ -23,7 +23,9 @@ RUN corepack install
 # ---- build stage ----
 FROM base AS build
 COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile || pnpm install
+# No `|| pnpm install` fallback: a lockfile that doesn't match package.json must FAIL the
+# build, not silently resolve fresh (unpinned) versions and defeat supply-chain integrity.
+RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm prisma generate && pnpm build
 
@@ -73,10 +75,15 @@ COPY --from=build /app/docker-entrypoint.sh ./docker-entrypoint.sh
 # from the app's traced node_modules so neither clobbers the other.
 COPY --from=tools /tools/node_modules /opt/tools/node_modules
 
+# Create the uploads mountpoint and own it as the runtime user BEFORE the named volume
+# mounts over it: a first-time named volume inherits the image directory's ownership, so
+# this is what lets the non-root `nextjs` user actually write progress photos to
+# /data/uploads (UPLOAD_DIR). Without it the volume is root-owned and writes fail with EACCES.
 RUN groupadd -g 1001 nodejs \
   && useradd -u 1001 -g nodejs -m nextjs \
   && chmod +x /app/docker-entrypoint.sh \
-  && chown -R nextjs:nodejs /app
+  && mkdir -p /data/uploads \
+  && chown -R nextjs:nodejs /app /data
 USER nextjs
 EXPOSE 3000
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

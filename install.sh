@@ -66,11 +66,15 @@ else
   # `caddy` compose profile; http/localhost stays bring-your-own-proxy.
   CADDY_DOMAIN=""
   COMPOSE_PROFILES=""
+  # Default: publish the app on all interfaces (simple no-TLS LAN access). When Caddy fronts
+  # the app for TLS, bind the app port to loopback only so plaintext traffic can't bypass TLS.
+  APP_BIND="0.0.0.0"
   case "$APP_URL_ARG" in
     https://*)
       CADDY_DOMAIN="${APP_URL_ARG#https://}"; CADDY_DOMAIN="${CADDY_DOMAIN%%/*}"
       COMPOSE_PROFILES="caddy"
-      log "Public https URL — enabling the Caddy HTTPS proxy (domain: ${CADDY_DOMAIN})."
+      APP_BIND="127.0.0.1"
+      log "Public https URL — enabling the Caddy HTTPS proxy (domain: ${CADDY_DOMAIN}); app port bound to loopback."
       ;;
   esac
 
@@ -79,6 +83,7 @@ else
 NODE_ENV=production
 APP_URL=${APP_URL_ARG}
 APP_PORT=${APP_PORT}
+APP_BIND=${APP_BIND}
 TRUST_PROXY=true
 COMPOSE_PROFILES=${COMPOSE_PROFILES}
 CADDY_DOMAIN=${CADDY_DOMAIN}

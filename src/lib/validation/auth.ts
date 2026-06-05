@@ -13,9 +13,10 @@ export const passwordSchema = z.string().min(10, 'Use at least 10 characters').m
 export const handleSchema = z
   .string()
   .trim()
-  .min(3)
+  .toLowerCase() // canonicalize: handles are case-insensitive, so store one form to prevent
+  .min(3) //         case-variant duplicates slipping past the publicHandle unique constraint.
   .max(24)
-  .regex(/^[a-z0-9_]+$/i, 'Letters, numbers and underscores only');
+  .regex(/^[a-z0-9_]+$/, 'Letters, numbers and underscores only');
 
 export const loginSchema = z.object({
   email: emailSchema,

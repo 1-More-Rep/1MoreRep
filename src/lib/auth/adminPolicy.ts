@@ -40,6 +40,16 @@ export function canChangeRole(
   return ALLOW;
 }
 
+/** Can `actor` reactivate (un-deactivate) `target`? Symmetric to {@link canDeactivate}. */
+export function canReactivate(actor: PolicyActor, target: PolicyTarget): PolicyResult {
+  if (RANK[actor.role] < RANK.ADMIN) return deny('Insufficient privileges');
+  // An admin must not be able to override a superadmin's active-state decisions.
+  if (target.role === 'SUPERADMIN' && actor.role !== 'SUPERADMIN') {
+    return deny('Only a superadmin can reactivate a superadmin');
+  }
+  return ALLOW;
+}
+
 /** Can `actor` deactivate `target`? */
 export function canDeactivate(
   actor: PolicyActor,

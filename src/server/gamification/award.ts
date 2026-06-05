@@ -56,8 +56,9 @@ export async function awardXp(
   ctx: XpContext,
   extraStats: Prisma.UserStatsUpdateInput = {},
 ): Promise<XpCommit> {
-  const todays = await prisma.xpEvent.findMany({ where: { userId, dayKey: ctx.dk } });
-  let remaining = DAILY_XP_CAP - todays.reduce((a, e) => a + e.amount, 0);
+  // Sum today's XP in the DB rather than loading every row into memory just to add it up.
+  const spent = await prisma.xpEvent.aggregate({ where: { userId, dayKey: ctx.dk }, _sum: { amount: true } });
+  let remaining = DAILY_XP_CAP - (spent._sum.amount ?? 0);
 
   const events: (PendingEvent & { amount: number })[] = [];
   for (const p of pending) {
@@ -70,8 +71,17 @@ export async function awardXp(
 
   const xpSum = events.reduce((a, e) => a + e.amount, 0);
   const stats = await getOrCreateStats(userId);
-  const newLifetime = stats.lifetimeXp + xpSum;
-  const newLevel = levelForXp(newLifetime);
+  // lifetimeXp is written as an atomic { increment } (not an absolute read-modify-write)
+  // so concurrent producers — e.g. a friend-streak bonus racing the user's own workout
+  // award — can't silently clobber each other's XP. level is derived from the read for
+  // the leveled-up signal and self-corrects on the next award if it briefly lags.
+  const newLevel = levelForXp(stats.lifetimeXp + xpSum);
+
+  // Resolve the membership up-front (ensureLeagueMembership is an idempotent upsert) so the
+  // weekly-XP increment can join the SAME transaction as the ledger rows + lifetime bump.
+  // Previously it was a separate write: a crash between them left weeklyXp / the leaderboard
+  // permanently diverged from lifetimeXp. Now all three commit atomically or not at all.
+  const membershipId = await ensureLeagueMembership(userId, ctx.wk, stats.leagueTier);
 
   await prisma.$transaction([
     ...events.map((e) =>
@@ -91,12 +101,12 @@ export async function awardXp(
     ),
     prisma.userStats.update({
       where: { userId },
-      data: { lifetimeXp: newLifetime, level: newLevel, ...extraStats },
+      data: { lifetimeXp: { increment: xpSum }, level: newLevel, ...extraStats },
     }),
+    ...(xpSum > 0
+      ? [prisma.leagueMembership.update({ where: { id: membershipId }, data: { weeklyXp: { increment: xpSum } } })]
+      : []),
   ]);
-
-  const membershipId = await ensureLeagueMembership(userId, ctx.wk, stats.leagueTier);
-  if (xpSum > 0) await prisma.leagueMembership.update({ where: { id: membershipId }, data: { weeklyXp: { increment: xpSum } } });
 
   return { xpAwarded: xpSum, newLevel, leveledUp: newLevel > stats.level };
 }
@@ -167,7 +177,8 @@ export async function awardForWorkout(userId: string, sessionId: string, prCount
     longestStreak: streakRes.state.longest,
     lastActiveDay: streakRes.state.lastActiveDay,
     freezesAvail: streakRes.state.freezes,
-    totalVolume: newTotalVolume,
+    // Atomic increment (not an absolute write) so concurrent volume credits don't clobber.
+    totalVolume: { increment: BigInt(volumeCentiKg) },
     totalSessions: { increment: 1 },
   });
 

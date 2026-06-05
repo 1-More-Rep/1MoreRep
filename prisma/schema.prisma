@@ -84,29 +84,31 @@ model User {
   invitedBy   User?   @relation("Invites", fields: [invitedById], references: [id])
   invitees    User[]  @relation("Invites")
 
-  sessions    Session[]
-  authTokens  AuthToken[]
-  auditEvents AuditEvent[] @relation("ActorEvents")
-  exercises   Exercise[] // custom exercises owned by this user
-  routines    Routine[]
-  workouts    WorkoutSession[]
-  prs         PersonalRecord[]
-  sorenessReports  SorenessReport[]
-  fatigueSnapshots MuscleFatigueSnapshot[]
-  xpEvents         XpEvent[]
-  stats            UserStats?
-  leagueMemberships LeagueMembership[]
-  notifications    Notification[]
-  friendshipsSent     Friendship[] @relation("FriendRequester")
-  friendshipsReceived Friendship[] @relation("FriendAddressee")
-  blocksMade       Block[]      @relation("Blocker")
-  blocksReceived   Block[]      @relation("Blocked")
-  privacy          PrivacySettings?
-  activityEvents   ActivityEvent[]
-  bodyMetrics      BodyMetric[]
-  progressPhotos   ProgressPhoto[]
-  pushSubscriptions PushSubscription[]
-  notifPrefs       NotificationPreference?
+  sessions             Session[]
+  authTokens           AuthToken[]
+  auditEvents          AuditEvent[]            @relation("ActorEvents")
+  exercises            Exercise[] // custom exercises owned by this user
+  routines             Routine[]
+  workouts             WorkoutSession[]
+  prs                  PersonalRecord[]
+  sorenessReports      SorenessReport[]
+  fatigueSnapshots     MuscleFatigueSnapshot[]
+  xpEvents             XpEvent[]
+  stats                UserStats?
+  leagueMemberships    LeagueMembership[]
+  notifications        Notification[]
+  friendshipsSent      Friendship[]            @relation("FriendRequester")
+  friendshipsReceived  Friendship[]            @relation("FriendAddressee")
+  blocksMade           Block[]                 @relation("Blocker")
+  blocksReceived       Block[]                 @relation("Blocked")
+  privacy              PrivacySettings?
+  activityEvents       ActivityEvent[]
+  friendStreaksA       FriendStreak[]          @relation("FriendStreakA")
+  friendStreaksB       FriendStreak[]          @relation("FriendStreakB")
+  bodyMetrics          BodyMetric[]
+  progressPhotos       ProgressPhoto[]
+  pushSubscriptions    PushSubscription[]
+  notifPrefs           NotificationPreference?
   invitesCreated       InviteLink[]
   leaderboardSnapshots LeaderboardSnapshot[]
   feedback             Feedback[]
@@ -131,6 +133,7 @@ model Session {
 
   @@index([userId])
   @@index([idleExpiresAt])
+  @@index([absoluteExpiresAt])
 }
 
 model AuthToken {
@@ -170,11 +173,11 @@ model InstanceSettings {
   smtpSecure      Boolean @default(true)
 
   // LLM (Ollama default; remote keys encrypted)
-  llmProvider String  @default("NONE") // NONE | OLLAMA | ANTHROPIC | OPENAI
-  llmBaseUrl  String? @default("http://ollama:11434")
-  llmModel    String? @default("llama3.1")
+  llmProvider  String  @default("NONE") // NONE | OLLAMA | ANTHROPIC | OPENAI
+  llmBaseUrl   String? @default("http://ollama:11434")
+  llmModel     String? @default("llama3.1")
   llmApiKeyEnc String?
-  llmTimeoutMs Int    @default(20000)
+  llmTimeoutMs Int     @default(20000)
 
   // Web Push VAPID (private key encrypted)
   vapidPublicKey     String?
@@ -199,6 +202,7 @@ model AuditEvent {
   @@index([actorId])
   @@index([action])
   @@index([createdAt])
+  @@index([targetType, targetId])
 }
 
 // ---------------------------------------------------------------------------
@@ -269,30 +273,30 @@ enum MuscleRole {
 }
 
 model Exercise {
-  id            String           @id @default(cuid())
-  slug          String
-  name          String
-  category      ExCategory       @default(STRENGTH)
-  equipment     Equipment        @default(OTHER)
-  mechanic      Mechanic?
-  force         Force?
-  level         String?
-  instructions  String[]
-  iconKey       String           @default("dumbbell")
-  defaultSets   Int              @default(3)
-  defaultRepLow Int              @default(8)
-  defaultRepHigh Int             @default(12)
-  defaultRestSec Int             @default(120)
-  isCustom      Boolean          @default(false)
-  ownerId       String?
-  owner         User?            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  source        String           @default("FREE_EXERCISE_DB")
-  sourceId      String?          @unique // original dataset id; makes reseed idempotent
-  muscleLinks   ExerciseMuscle[]
-  routineItems  RoutineItem[]
+  id             String           @id @default(cuid())
+  slug           String
+  name           String
+  category       ExCategory       @default(STRENGTH)
+  equipment      Equipment        @default(OTHER)
+  mechanic       Mechanic?
+  force          Force?
+  level          String?
+  instructions   String[]
+  iconKey        String           @default("dumbbell")
+  defaultSets    Int              @default(3)
+  defaultRepLow  Int              @default(8)
+  defaultRepHigh Int              @default(12)
+  defaultRestSec Int              @default(120)
+  isCustom       Boolean          @default(false)
+  ownerId        String?
+  owner          User?            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  source         String           @default("FREE_EXERCISE_DB")
+  sourceId       String?          @unique // original dataset id; makes reseed idempotent
+  muscleLinks    ExerciseMuscle[]
+  routineItems   RoutineItem[]
   sessionEntries SessionEntry[]
-  prs           PersonalRecord[]
-  createdAt     DateTime         @default(now())
+  prs            PersonalRecord[]
+  createdAt      DateTime         @default(now())
 
   @@index([ownerId])
   @@index([name])
@@ -379,6 +383,8 @@ model RoutineItem {
   notes         String?
 
   @@unique([routineId, order])
+  // Standalone exerciseId index so the RESTRICT FK check on exercise delete doesn't scan.
+  @@index([exerciseId])
 }
 
 /// A workout session — serves both the live (ACTIVE) and historical (COMPLETED)
@@ -403,32 +409,38 @@ model WorkoutSession {
 
   @@index([ownerId, status])
   @@index([ownerId, startedAt])
+  // History/streak queries filter on (ownerId, completedAt) for COMPLETED sessions.
+  @@index([ownerId, completedAt])
+  // FK lookup for routine delete / SetNull cascade.
+  @@index([routineId])
 }
 
 model SessionEntry {
-  id                  String   @id @default(cuid())
+  id                  String         @id @default(cuid())
   sessionId           String
   session             WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   exerciseId          String
-  exercise            Exercise @relation(fields: [exerciseId], references: [id])
+  exercise            Exercise       @relation(fields: [exerciseId], references: [id])
   order               Int
   supersetGroup       Int?
   originRoutineItemId String? // null = added mid-workout
-  targetSets          Int      @default(3)
-  targetRepLow        Int      @default(8)
-  targetRepHigh       Int      @default(12)
-  targetRestSec       Int      @default(120)
+  targetSets          Int            @default(3)
+  targetRepLow        Int            @default(8)
+  targetRepHigh       Int            @default(12)
+  targetRestSec       Int            @default(120)
   targetRpe           Float?
   targetLoadKg        Float? // generator's suggested working load, pre-fills the first set
-  isRemoved           Boolean  @default(false) // soft-remove preserves diff intent
+  isRemoved           Boolean        @default(false) // soft-remove preserves diff intent
   sets                SetLog[]
 
   @@unique([sessionId, order])
   @@index([sessionId])
+  // Exercise-history queries and the RESTRICT FK check on exercise delete scan by exerciseId.
+  @@index([exerciseId])
 }
 
 model SetLog {
-  id          String    @id @default(cuid())
+  id          String       @id @default(cuid())
   entryId     String
   entry       SessionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
   setIndex    Int
@@ -436,8 +448,8 @@ model SetLog {
   reps        Int?
   rpe         Float?
   rir         Int?
-  isWarmup    Boolean   @default(false)
-  completed   Boolean   @default(false)
+  isWarmup    Boolean      @default(false)
+  completed   Boolean      @default(false)
   completedAt DateTime?
 
   @@unique([entryId, setIndex])
@@ -458,6 +470,9 @@ model PersonalRecord {
 
   @@unique([ownerId, exerciseId, kind])
   @@index([ownerId])
+  // Standalone exerciseId index so the RESTRICT FK check on exercise delete doesn't scan.
+  @@index([exerciseId])
+  @@index([sessionId])
 }
 
 // ---------------------------------------------------------------------------
@@ -477,13 +492,13 @@ model SorenessReport {
 
 /// Derived cache (rebuildable from SetLog + SorenessReport) of per-muscle fatigue.
 model MuscleFatigueSnapshot {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   ownerId       String
-  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   muscle        Muscle
   fatigue       Float
   recoveryEtaAt DateTime?
-  computedAt    DateTime @default(now())
+  computedAt    DateTime  @default(now())
 
   @@unique([ownerId, muscle])
 }
@@ -545,33 +560,37 @@ model XpEvent {
   @@index([userId, dayKey])
   @@index([userId, weekKey])
   @@index([weekKey])
+  // Idempotency guard (award.ts) runs findFirst({ userId, workoutId }) on every workout
+  // finish — without this it is a full table scan that grows with the ledger.
+  @@index([userId, workoutId])
 }
 
 /// Denormalized rollup (rebuildable from XpEvent + sessions).
 model UserStats {
-  userId        String   @id
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lifetimeXp    Int      @default(0)
-  level         Int      @default(1)
-  currentStreak Int      @default(0)
-  longestStreak Int      @default(0)
-  lastActiveDay String?
-  freezesAvail  Int      @default(0)
-  totalVolume   BigInt   @default(0) // centi-kg
-  totalSessions Int      @default(0)
-  leagueTier    String   @default("BRONZE")
-  updatedAt     DateTime @updatedAt
+  userId             String   @id
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lifetimeXp         Int      @default(0)
+  level              Int      @default(1)
+  currentStreak      Int      @default(0)
+  longestStreak      Int      @default(0)
+  lastActiveDay      String?
+  freezesAvail       Int      @default(0)
+  totalVolume        BigInt   @default(0) // centi-kg
+  totalSessions      Int      @default(0)
+  leagueTier         String   @default("BRONZE")
+  lastStreakNudgeDay String? // local dayKey of the last streak-risk push (per-day idempotency)
+  updatedAt          DateTime @updatedAt
 
   @@index([lifetimeXp])
   @@index([longestStreak])
 }
 
 model LeagueCohort {
-  id        String       @id @default(cuid())
+  id        String             @id @default(cuid())
   tier      String
   weekKey   String
-  status    CohortStatus @default(ACTIVE)
-  createdAt DateTime     @default(now())
+  status    CohortStatus       @default(ACTIVE)
+  createdAt DateTime           @default(now())
   members   LeagueMembership[]
 
   @@index([weekKey, status])
@@ -605,6 +624,8 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, createdAt])
+  // Serves the unread-count / unread-list query (userId + readAt IS NULL).
+  @@index([userId, readAt])
 }
 
 /// Scheduled-job observability + idempotency lock.
@@ -700,7 +721,9 @@ model ActivityEvent {
 model FriendStreak {
   id         String   @id @default(cuid())
   userAId    String
+  userA      User     @relation("FriendStreakA", fields: [userAId], references: [id], onDelete: Cascade)
   userBId    String
+  userB      User     @relation("FriendStreakB", fields: [userBId], references: [id], onDelete: Cascade)
   count      Int      @default(0)
   lastDayKey String?
   active     Boolean  @default(true)
@@ -728,14 +751,14 @@ model BodyMetric {
 }
 
 model ProgressPhoto {
-  id        String   @id @default(cuid())
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  storageKey String  // file under the uploads volume (outside webroot); never a public path
-  width     Int
-  height    Int
-  takenAt   DateTime @default(now())
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  ownerId    String
+  owner      User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  storageKey String // file under the uploads volume (outside webroot); never a public path
+  width      Int
+  height     Int
+  takenAt    DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   @@index([ownerId, takenAt])
 }
@@ -745,16 +768,16 @@ model ProgressPhoto {
 // ---------------------------------------------------------------------------
 
 model PushSubscription {
-  id           String   @id @default(cuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  endpoint     String   @unique
-  p256dh       String
-  auth         String
-  userAgent    String?
-  createdAt    DateTime @default(now())
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint      String    @unique
+  p256dh        String
+  auth          String
+  userAgent     String?
+  createdAt     DateTime  @default(now())
   lastSuccessAt DateTime?
-  failureCount Int      @default(0)
+  failureCount  Int       @default(0)
 
   @@index([userId])
 }

@@ -7,7 +7,7 @@ import type { Role } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { requireRole } from '@/lib/auth/guards';
 import { createSession, destroyAllSessions, destroyCurrentSession, validateSession } from '@/lib/auth/session';
-import { canChangeRole, canDeactivate, canInvite, canEditSettings } from '@/lib/auth/adminPolicy';
+import { canChangeRole, canDeactivate, canReactivate, canInvite, canEditSettings } from '@/lib/auth/adminPolicy';
 import { issueToken } from '@/lib/auth/tokens';
 import { sendMagicLink, verifySmtp } from '@/lib/mail';
 import { updateSettings, encryptForStorage } from '@/lib/settings';
@@ -16,11 +16,29 @@ import { getConfiguredProvider } from '@/server/llm';
 import { audit } from '@/lib/auth/audit';
 import { getRequestContext } from '@/lib/request';
 import { emailSchema } from '@/lib/validation/auth';
+import { logger } from '@/lib/logger';
 
 // Providers with a working adapter today. ANTHROPIC/OPENAI are stubbed (not yet
 // implemented). Kept un-exported: a 'use server' file may only export async fns.
 const SUPPORTED_LLM_PROVIDERS = ['NONE', 'OLLAMA'] as const;
 const llmProviderSchema = z.enum(SUPPORTED_LLM_PROVIDERS);
+
+const ROLE_VALUES = ['USER', 'ADMIN', 'SUPERADMIN'] as const;
+/** Parse a raw FormData value into a Role, or null if it is not a valid Role. */
+function parseRole(value: FormDataEntryValue | null): Role | null {
+  const s = String(value ?? '');
+  return (ROLE_VALUES as readonly string[]).includes(s) ? (s as Role) : null;
+}
+
+/** True if `u` parses as an http: or https: URL. */
+function isHttpUrl(u: string): boolean {
+  try {
+    const url = new URL(u);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 export interface AdminState {
   error?: string;
@@ -29,7 +47,11 @@ export interface AdminState {
 }
 
 async function activeSuperadminCount(): Promise<number> {
-  return prisma.user.count({ where: { role: 'SUPERADMIN', status: { not: 'DEACTIVATED' } } });
+  // Only ACTIVE superadmins can actually sign in and administer the instance. Counting
+  // INVITED ones (who have never accepted their invite and cannot authenticate) would let
+  // the last-superadmin guard be satisfied by a phantom, allowing the only usable
+  // superadmin to be deactivated/demoted — locking the instance out of superadmin access.
+  return prisma.user.count({ where: { role: 'SUPERADMIN', status: 'ACTIVE' } });
 }
 
 /** Invite a user by email (sends an INVITE magic link). */
@@ -37,7 +59,8 @@ export async function inviteUserAction(_prev: AdminState, formData: FormData): P
   const actor = await requireRole('ADMIN');
   const emailParsed = emailSchema.safeParse(formData.get('email'));
   if (!emailParsed.success) return { error: 'Enter a valid email.' };
-  const role = (String(formData.get('role') ?? 'USER') as Role) || 'USER';
+  const role = parseRole(formData.get('role'));
+  if (!role) return { error: 'Invalid role.' };
 
   const policy = canInvite(actor, role);
   if (!policy.ok) return { error: policy.reason };
@@ -57,16 +80,24 @@ export async function inviteUserAction(_prev: AdminState, formData: FormData): P
     },
   });
   const { url } = await issueToken('INVITE', user.id, { ip: ctx.ip });
-  await sendMagicLink('INVITE', email, url);
   await audit({ actorId: actor.id, action: 'user.invite', targetType: 'User', targetId: user.id, ip: ctx.ip });
   revalidatePath('/admin/users');
+  // The user + token already exist; if the email fails, say so clearly instead of throwing a
+  // raw error that leaves the admin unsure whether the invite was created at all.
+  try {
+    await sendMagicLink('INVITE', email, url);
+  } catch (err) {
+    logger.error({ err, email }, '[admin] invite email failed to send');
+    return { ok: true, notice: `User created, but the invite email could not be sent — check SMTP settings, then use Reset to resend.` };
+  }
   return { ok: true, notice: `Invitation sent to ${email}.` };
 }
 
 export async function setRoleAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const actor = await requireRole('ADMIN');
   const targetId = String(formData.get('targetId') ?? '');
-  const newRole = String(formData.get('role') ?? '') as Role;
+  const newRole = parseRole(formData.get('role'));
+  if (!newRole) return { error: 'Invalid role.' };
   const target = await prisma.user.findUnique({ where: { id: targetId } });
   if (!target) return { error: 'User not found.' };
 
@@ -94,6 +125,10 @@ export async function toggleActiveAction(_prev: AdminState, formData: FormData):
     await prisma.user.update({ where: { id: targetId }, data: { status: 'DEACTIVATED' } });
     await prisma.session.deleteMany({ where: { userId: targetId } }); // kill sessions
   } else {
+    // Reactivation needs the same role gate as deactivation — an admin must not be
+    // able to reactivate a superadmin a superadmin had disabled.
+    const policy = canReactivate(actor, target);
+    if (!policy.ok) return { error: policy.reason };
     await prisma.user.update({ where: { id: targetId }, data: { status: 'ACTIVE' } });
   }
   await audit({ actorId: actor.id, action: activate ? 'user.activate' : 'user.deactivate', targetType: 'User', targetId });
@@ -109,8 +144,13 @@ export async function resetUserAction(_prev: AdminState, formData: FormData): Pr
   if (target.role === 'SUPERADMIN' && actor.role !== 'SUPERADMIN') return { error: 'Only a superadmin can reset a superadmin.' };
 
   const { url } = await issueToken('PASSWORD_RESET', target.id);
-  await sendMagicLink('PASSWORD_RESET', target.email, url);
   await audit({ actorId: actor.id, action: 'user.reset', targetType: 'User', targetId });
+  try {
+    await sendMagicLink('PASSWORD_RESET', target.email, url);
+  } catch (err) {
+    logger.error({ err, email: target.email }, '[admin] reset email failed to send');
+    return { error: 'The reset link could not be emailed — check SMTP settings and try again.' };
+  }
   return { ok: true, notice: `Reset link sent to ${target.email}.` };
 }
 
@@ -162,10 +202,17 @@ export async function updateLlmAction(_prev: AdminState, formData: FormData): Pr
   if (!providerParsed.success) {
     return { error: 'That LLM provider is not supported yet. Choose None or Ollama.' };
   }
+  const llmBaseUrl = String(formData.get('llmBaseUrl') ?? '').trim() || null;
+  // SSRF hardening: the base URL is later fetch()'d server-side. We can't block private
+  // hosts (a self-hosted Ollama legitimately lives on localhost/a private network), but
+  // we restrict the scheme to http(s) so other protocols can't be smuggled in.
+  if (llmBaseUrl && !isHttpUrl(llmBaseUrl)) {
+    return { error: 'LLM base URL must be a valid http(s) URL.' };
+  }
   await updateSettings(
     {
       llmProvider: providerParsed.data,
-      llmBaseUrl: String(formData.get('llmBaseUrl') ?? '').trim() || null,
+      llmBaseUrl,
       llmModel: String(formData.get('llmModel') ?? '').trim() || null,
       ...(apiKey ? { llmApiKeyEnc: encryptForStorage(apiKey) } : {}),
     },
@@ -270,6 +317,14 @@ export async function stopImpersonatingAction(): Promise<AdminState> {
 
   const ctx = await getRequestContext();
   await destroyCurrentSession(); // end the impersonation session
+  // Re-validate the admin before restoring their session: they may have been deactivated
+  // or demoted while impersonating (their own sessions were destroyed, but the
+  // impersonation session lives under the target's userId and survives). Don't mint a
+  // fresh privileged session for an account that's no longer ACTIVE / no longer staff.
+  const admin = await prisma.user.findUnique({ where: { id: impersonatorId }, select: { status: true, role: true } });
+  if (!admin || admin.status !== 'ACTIVE' || admin.role === 'USER') {
+    redirect('/login');
+  }
   await createSession(impersonatorId, ctx); // re-establish the real admin's session
   await audit({ actorId: impersonatorId, action: 'user.impersonate.stop', targetType: 'User', targetId: impersonatedId, ip: ctx.ip });
   redirect('/admin/users');

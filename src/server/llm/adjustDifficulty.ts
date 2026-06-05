@@ -1,4 +1,5 @@
 import 'server-only';
+import { z } from 'zod';
 import type { GeneratorPlan, PlannedExercise } from '@/domain/generator/types';
 import type { LLMProvider } from './provider';
 import { getConfiguredProvider } from './index';
@@ -31,14 +32,23 @@ export function deterministicAdjust(plan: GeneratorPlan, dir: Direction): Genera
 
 const SYSTEM = `You are a strength coach adjusting an EXISTING workout's difficulty. You may ONLY change sets, repLow, repHigh, loadSuggestionKg, and rpeTarget for the exercises given — never add, remove, rename, or invent exercises. Reply as JSON: {"adjustments":[{"exerciseId","sets","repLow","repHigh","loadSuggestionKg","rpeTarget"}]}. Keep changes modest and safe.`;
 
-interface LlmAdjustment {
-  exerciseId?: string;
-  sets?: number;
-  repLow?: number;
-  repHigh?: number;
-  loadSuggestionKg?: number | null;
-  rpeTarget?: number;
-}
+// Validate the LLM's JSON shape at the trust boundary instead of a bare `as` cast. Field
+// values are still clamped below — this just guarantees the top-level structure and types
+// before we touch them (a wrong-typed field is dropped rather than silently coerced).
+const llmResponseSchema = z.object({
+  adjustments: z
+    .array(
+      z.object({
+        exerciseId: z.string().optional(),
+        sets: z.number().optional(),
+        repLow: z.number().optional(),
+        repHigh: z.number().optional(),
+        loadSuggestionKg: z.number().nullable().optional(),
+        rpeTarget: z.number().optional(),
+      }),
+    )
+    .optional(),
+});
 
 /**
  * Adjust a plan's difficulty up/down. Uses the configured LLM when reachable,
@@ -58,10 +68,10 @@ export async function adjustDifficulty(plan: GeneratorPlan, dir: Direction, prov
       exercises: plan.exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.name, sets: e.sets, repLow: e.repLow, repHigh: e.repHigh, loadSuggestionKg: e.loadSuggestionKg, rpeTarget: e.rpeTarget })),
     });
     const { text } = await p.complete({ system: SYSTEM, user, json: true, maxTokens: 500 });
-    const parsed = JSON.parse(text) as { adjustments?: LlmAdjustment[] };
-    if (!parsed || !Array.isArray(parsed.adjustments)) return baseline;
+    const parsed = llmResponseSchema.safeParse(JSON.parse(text));
+    if (!parsed.success || !parsed.data.adjustments) return baseline;
 
-    const byId = new Map(parsed.adjustments.filter((a) => typeof a.exerciseId === 'string').map((a) => [a.exerciseId!, a]));
+    const byId = new Map(parsed.data.adjustments.filter((a) => typeof a.exerciseId === 'string').map((a) => [a.exerciseId!, a]));
     let applied = 0;
     const exercises = plan.exercises.map((e) => {
       const a = byId.get(e.exerciseId); // out-of-catalog adjustments are simply never matched here

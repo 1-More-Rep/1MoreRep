@@ -20,6 +20,16 @@ export function FeedbackForm() {
     if (state.notice) setMessage('');
   }, [state.notice]);
 
+  // Roving arrow-key navigation for the category radiogroup (ARIA APG Radio pattern).
+  function onRadioKey(e: React.KeyboardEvent, idx: number) {
+    if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key)) return;
+    e.preventDefault();
+    const dir = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : -1;
+    const next = (idx + dir + FEEDBACK_CATEGORIES.length) % FEEDBACK_CATEGORIES.length;
+    setCategory(FEEDBACK_CATEGORIES[next]!);
+    document.getElementById(`fb-cat-${next}`)?.focus();
+  }
+
   return (
     <Card>
       <SectionLabel style={{ marginBottom: 12 }}>Send feedback</SectionLabel>
@@ -31,12 +41,17 @@ export function FeedbackForm() {
         <div role="radiogroup" aria-label="What kind of feedback?">
           <span id="feedback-kind-label" style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>What kind?</span>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-            {FEEDBACK_CATEGORIES.map((c) => (
+            {FEEDBACK_CATEGORIES.map((c, i) => (
               <Btn
                 key={c}
+                id={`fb-cat-${i}`}
                 type="button"
                 role="radio"
                 aria-checked={category === c}
+                // APG radiogroup: only the checked radio is tabbable; arrow keys move
+                // focus + selection within the group.
+                tabIndex={category === c ? 0 : -1}
+                onKeyDown={(e) => onRadioKey(e, i)}
                 kind={category === c ? 'primary' : 'soft'}
                 size="sm"
                 onClick={() => setCategory(c)}

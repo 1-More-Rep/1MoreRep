@@ -37,8 +37,14 @@ export function BodyMap({
         tabIndex={0}
         className="bodymap-region"
         aria-label={label}
+        aria-pressed={isSel}
         onClick={() => onSelect?.(muscle)}
-        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelect?.(muscle)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault(); // Space would otherwise scroll the page on activate
+            onSelect?.(muscle);
+          }
+        }}
         style={{ cursor: onSelect ? 'pointer' : 'default', fill: fill(fatigue[muscle]), stroke: isSel ? 'var(--accent)' : 'var(--line-2)', strokeWidth: isSel ? 1.6 : 0.7, transition: 'fill .3s' }}
       >
         {children}
@@ -56,7 +62,7 @@ export function BodyMap({
         <Btn kind={view === 'back' ? 'primary' : 'soft'} size="sm" onClick={() => setView('back')}>Back</Btn>
       </div>
 
-      <svg viewBox="0 0 120 250" width="100%" style={{ maxWidth: 280, display: 'block' }} aria-label={`Muscle fatigue, ${view} view`}>
+      <svg role="img" viewBox="0 0 120 250" width="100%" style={{ maxWidth: 280, display: 'block' }} aria-label={`Muscle fatigue, ${view} view`}>
         {/* silhouette (non-interactive so muscle regions own the clicks) */}
         <g className="bodymap-silhouette" style={{ fill: 'var(--surface)', stroke: 'var(--line)', strokeWidth: 1 }}>
           <ellipse cx="60" cy="22" rx="13" ry="15" /> {/* head */}

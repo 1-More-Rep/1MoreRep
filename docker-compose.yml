@@ -34,7 +34,6 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-onemorerep}:${POSTGRES_PASSWORD:-devpassword}@db:5432/${POSTGRES_DB:-onemorerep}?schema=public
       PORT: '3000'
       APP_KEY: ${APP_KEY:-}
-      SESSION_SECRET: ${SESSION_SECRET:-}
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-}
       TRUST_PROXY: ${TRUST_PROXY:-false}
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
@@ -45,7 +44,11 @@ services:
     volumes:
       - uploads:/data/uploads
     ports:
-      - '${APP_PORT:-3000}:3000'
+      # Host interface is configurable so a TLS (caddy-profile) deployment can bind the app to
+      # loopback only — `APP_BIND=127.0.0.1` — keeping the plaintext app port off the public
+      # interface so traffic can't bypass Caddy's TLS. Defaults to 0.0.0.0 for the simple
+      # no-TLS LAN setup. install.sh sets APP_BIND=127.0.0.1 alongside COMPOSE_PROFILES=caddy.
+      - '${APP_BIND:-0.0.0.0}:${APP_PORT:-3000}:3000'
     healthcheck:
       test:
         [

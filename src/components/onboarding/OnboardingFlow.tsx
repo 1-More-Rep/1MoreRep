@@ -131,9 +131,10 @@ export function OnboardingFlow() {
       {s.step === 0 && (
         <Card>
           <SectionLabel style={{ marginBottom: 12 }}>What&apos;s your main goal?</SectionLabel>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          {/* role=radio + aria-checked so the selection is exposed to AT, not conveyed by color alone. */}
+          <div role="radiogroup" aria-label="Main goal" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {GOALS.map((g) => (
-              <button key={g.value} onClick={() => set('goal', g.value)} style={pillBtn(s.goal === g.value)}>{g.label}</button>
+              <button key={g.value} role="radio" aria-checked={s.goal === g.value} onClick={() => set('goal', g.value)} style={pillBtn(s.goal === g.value)}>{g.label}</button>
             ))}
           </div>
         </Card>
@@ -142,9 +143,9 @@ export function OnboardingFlow() {
       {s.step === 1 && (
         <Card>
           <SectionLabel style={{ marginBottom: 12 }}>Your experience</SectionLabel>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div role="radiogroup" aria-label="Experience level" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {LEVELS.map((l) => (
-              <button key={l.value} onClick={() => set('experience', l.value)} style={pillBtn(s.experience === l.value)}>
+              <button key={l.value} role="radio" aria-checked={s.experience === l.value} onClick={() => set('experience', l.value)} style={pillBtn(s.experience === l.value)}>
                 {l.label}
                 <span style={{ display: 'block', fontSize: 12, fontWeight: 400, color: 'var(--text-3)', marginTop: 2 }}>{l.desc}</span>
               </button>

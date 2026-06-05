@@ -23,7 +23,8 @@ export function TextField({
           color: 'var(--text)',
           fontSize: 15,
           fontFamily: 'var(--font-sans)',
-          outline: 'none',
+          // No inline `outline: none` — it has 1-0-0-0 specificity and silently overrode the
+          // global :focus-visible ring, leaving keyboard users with no visible focus (WCAG 2.4.7).
         }}
         {...rest}
       />

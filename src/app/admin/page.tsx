@@ -60,7 +60,10 @@ export default async function AdminDashboard() {
             return (
               <div key={job} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: 'var(--text-2)' }}>
                 <Mono style={{ flex: 1 }}>{job}</Mono>
-                {overdue && run && <Chip style={{ color: '#b06a00' }}>overdue</Chip>}
+                {/* Warn whenever a job is overdue — including a job that has NEVER run,
+                    which is the loudest possible signal that the cron sidecar isn't wired
+                    up. Previously `&& run` suppressed the badge in exactly that case. */}
+                {overdue && <Chip style={{ color: '#8a5200' }}>{run ? 'overdue' : 'never run — check cron'}</Chip>}
                 <span style={{ color, fontWeight: 600 }}>{status === 'NONE' ? 'never run' : status}</span>
                 <Mono style={{ color: 'var(--text-3)', fontSize: 12, width: 96, textAlign: 'right' }}>
                   {run ? (run.finishedAt ?? run.startedAt).toISOString().slice(0, 16).replace('T', ' ') : '—'}

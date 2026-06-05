@@ -19,9 +19,11 @@ const EnvSchema = z.object({
     .string()
     .min(1)
     .default('postgresql://onemorerep:devpassword@localhost:5432/onemorerep?schema=public'),
-  // Secrets — required in production at runtime; optional in dev/test/build.
+  // Secret — required in production at runtime; optional in dev/test/build. APP_KEY is the
+  // single signing/encryption key (sessions are signed via crypto.ts/hmacIp from it). There
+  // is intentionally no SESSION_SECRET: it was never read anywhere and only created false
+  // assurance that sessions were hardened by a second, separate secret.
   APP_KEY: z.string().optional(),
-  SESSION_SECRET: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

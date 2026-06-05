@@ -26,14 +26,20 @@ export async function streakRollover(now: Date = new Date()): Promise<{ processe
     const res = rolloverInto(state, today);
     if (res.outcome === 'intact') continue;
 
-    await prisma.userStats.update({
+    const statsUpdate = prisma.userStats.update({
       where: { userId: u.id },
       data: { currentStreak: res.state.current, lastActiveDay: res.state.lastActiveDay, freezesAvail: res.state.freezes },
     });
     if (res.outcome === 'reset') {
+      // Atomic: reset the streak and record the notification together, so a crash can't
+      // leave a streak silently reset with no row explaining it to the user.
+      await prisma.$transaction([
+        statsUpdate,
+        prisma.notification.create({ data: { userId: u.id, kind: 'STREAK_RISK', title: 'Streak reset', body: 'Your daily streak reset — start a fresh one today!' } }),
+      ]);
       reset++;
-      await prisma.notification.create({ data: { userId: u.id, kind: 'STREAK_RISK', title: 'Streak reset', body: 'Your daily streak reset — start a fresh one today!' } });
     } else {
+      await statsUpdate;
       frozen++;
     }
     processed++;

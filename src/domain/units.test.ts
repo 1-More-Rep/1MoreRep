@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { kgToLb, lbToKg, roundTo, clamp01, KG_PER_LB } from './units';
+import { kgToLb, lbToKg, roundTo, clamp01, KG_PER_LB, formatWeight, weightUnit, lengthUnit, toKg } from './units';
 
 describe('units', () => {
   it('converts kg <-> lb round-trip', () => {
@@ -20,5 +20,21 @@ describe('units', () => {
     expect(clamp01(1.7)).toBe(1);
     expect(clamp01(0.42)).toBe(0.42);
     expect(clamp01(NaN)).toBe(0);
+  });
+
+  it('formats weight per unit system', () => {
+    expect(formatWeight(100, 'METRIC')).toBe('100');
+    expect(formatWeight(100, 'IMPERIAL')).toBe('220.5'); // 100 kg → 220.46 lb
+    expect(formatWeight(60, 'IMPERIAL', 0)).toBe('132');
+    expect(formatWeight(null, 'METRIC')).toBe('—');
+    expect(formatWeight(NaN, 'IMPERIAL')).toBe('—');
+  });
+
+  it('labels and round-trips units', () => {
+    expect(weightUnit('METRIC')).toBe('kg');
+    expect(weightUnit('IMPERIAL')).toBe('lb');
+    expect(lengthUnit('IMPERIAL')).toBe('in');
+    expect(toKg(220.46226, 'IMPERIAL')).toBeCloseTo(100, 3);
+    expect(toKg(100, 'METRIC')).toBe(100);
   });
 });

@@ -46,7 +46,11 @@ export async function generateViewport(): Promise<Viewport> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
-    <html lang="en" data-theme="light" data-icon-style="soft" className={fontVars}>
+    // suppressHydrationWarning: themeBootScript (below) mutates data-theme / data-icon-style
+    // on <html> before React hydrates, to honor the stored preference without a flash. That
+    // deliberate server/client attribute difference is expected — suppress the warning it
+    // would otherwise raise on every route. (Scoped to <html>'s own attributes only.)
+    <html lang="en" data-theme="light" data-icon-style="soft" className={fontVars} suppressHydrationWarning>
       <head>
         {/* Apply stored theme before first paint to avoid a flash of default theme. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootScript }} />

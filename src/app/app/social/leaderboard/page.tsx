@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { requireUser } from '@/lib/auth/guards';
 import { getBoard, type BoardKey } from '@/server/queries/gamification';
 import { Card, Mono, SectionLabel } from '@/components/ui';
+import { weightUnit, kgToLb } from '@/domain/units';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,12 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
   const sp = await searchParams;
   const tab = TABS.find((t) => t.board === sp.board) ?? TABS[0]!;
   const { rows, self } = await getBoard(tab.board, user.id, 50);
+
+  // The VOLUME board stores kg·reps. Render everyone's value in the VIEWER's unit so a
+  // shared board never mixes kg and lb across users.
+  const isVolume = tab.board === 'VOLUME';
+  const dispUnit = isVolume ? `${weightUnit(user.unitSystem)}·reps` : tab.unit;
+  const conv = (v: number) => (isVolume && user.unitSystem === 'IMPERIAL' ? Math.round(kgToLb(v)) : v);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
@@ -60,12 +67,12 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
       <Card pad={false}>
         {rows.length === 0 && <div style={{ padding: 'var(--pad)', color: 'var(--text-3)' }}>No data yet — log some workouts!</div>}
         {rows.map((r) => (
-          <Row key={r.rank} rank={r.rank} name={r.name} value={r.value} isSelf={r.isSelf} unit={tab.unit} />
+          <Row key={r.rank} rank={r.rank} name={r.name} value={conv(r.value)} isSelf={r.isSelf} unit={dispUnit} />
         ))}
         {self && (
           <>
             <div style={{ padding: '4px var(--pad)', borderTop: '1px dashed var(--line-2)', textAlign: 'center', fontSize: 11, color: 'var(--text-3)' }}>⋯</div>
-            <Row rank={self.rank} name={user.publicHandle ?? user.displayName} value={self.value} isSelf unit={tab.unit} pinned />
+            <Row rank={self.rank} name={user.publicHandle ?? user.displayName} value={conv(self.value)} isSelf unit={dispUnit} pinned />
           </>
         )}
       </Card>

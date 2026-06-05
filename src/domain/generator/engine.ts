@@ -158,6 +158,16 @@ export function generateWorkout(input: GeneratorInput): GeneratorPlan {
       selectedIds.delete(removed.id);
       selected[worstIdx] = cand;
       selectedIds.add(cand.id);
+      // Keep coverage/primaryCount in sync with the swap. Without this, later iterations of
+      // this loop read STALE coverage: a muscle the removed exercise had covered still reads
+      // as covered (so it's never force-covered), and cand's own coverage isn't credited —
+      // causing redundant re-swaps and lost coverage.
+      for (const mw of removed.muscleWeights) coverage[mw.muscle] = Math.max(0, (coverage[mw.muscle] ?? 0) - mw.weight);
+      const removedPm = primaryMuscle(removed);
+      primaryCount[removedPm] = Math.max(0, (primaryCount[removedPm] ?? 0) - 1);
+      for (const mw of cand.muscleWeights) coverage[mw.muscle] = (coverage[mw.muscle] ?? 0) + mw.weight;
+      const candPm = primaryMuscle(cand);
+      primaryCount[candPm] = (primaryCount[candPm] ?? 0) + 1;
       rationale.push(`Forced ${MUSCLE_LABEL[m]} coverage (priority ${priority(m, input).toFixed(2)})`);
     }
   }

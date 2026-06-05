@@ -44,5 +44,8 @@ pnpm-debug.log*
 # claude code harness config (local)
 /.claude/
 
+# code-analysis scratch workspace (reports, static-tool output, browser traces)
+/.analysis/
+
 # e2e auth storage state (contains a session secret)
 tests/e2e/.auth/

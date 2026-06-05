@@ -31,5 +31,5 @@ export default async function ActiveWorkoutPage() {
       })),
   };
 
-  return <ActiveWorkout session={data} />;
+  return <ActiveWorkout session={data} unitSystem={user.unitSystem} />;
 }

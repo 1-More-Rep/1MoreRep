@@ -2,6 +2,7 @@ import 'server-only';
 import { Prisma } from '@prisma/client';
 import type { Goal, SessionEntry, SetLog } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
+import { logger } from '@/lib/logger';
 import { AuthorizationError } from '@/lib/auth/guards';
 import { diffSessionVsSnapshot, type LiveEntry, type RoutineDiff, type SnapshotItem } from '@/domain/routine/diff';
 import { applySessionPrs, type NewPr } from './prService';
@@ -34,12 +35,6 @@ export async function startSession(
   userId: string,
   opts: { routineId?: string; fromSessionId?: string; name?: string; goal?: Goal } = {},
 ): Promise<string> {
-  // Only one active session at a time — abandon any prior active session.
-  await prisma.workoutSession.updateMany({
-    where: { ownerId: userId, status: 'ACTIVE' },
-    data: { status: 'ABANDONED' },
-  });
-
   let snapshot: SnapshotItem[] | undefined;
   let entriesCreate: Prisma.SessionEntryCreateWithoutSessionInput[] = [];
   let name = opts.name;
@@ -98,16 +93,24 @@ export async function startSession(
     }));
   }
 
-  const session = await prisma.workoutSession.create({
-    data: {
-      ownerId: userId,
-      routineId: opts.routineId,
-      sourceSnapshot: snapshot ? (snapshot as unknown as Prisma.InputJsonValue) : undefined,
-      name,
-      goal,
-      status: 'ACTIVE',
-      entries: { create: entriesCreate },
-    },
+  // Abandon the prior ACTIVE session and create the new one atomically: if the create
+  // fails, the abandon rolls back, so a failed start never loses the in-progress workout.
+  const session = await prisma.$transaction(async (tx) => {
+    await tx.workoutSession.updateMany({
+      where: { ownerId: userId, status: 'ACTIVE' },
+      data: { status: 'ABANDONED' },
+    });
+    return tx.workoutSession.create({
+      data: {
+        ownerId: userId,
+        routineId: opts.routineId,
+        sourceSnapshot: snapshot ? (snapshot as unknown as Prisma.InputJsonValue) : undefined,
+        name,
+        goal,
+        status: 'ACTIVE',
+        entries: { create: entriesCreate },
+      },
+    });
   });
   return session.id;
 }
@@ -121,6 +124,10 @@ export async function addEntry(userId: string, sessionId: string, exerciseId: st
   await ownedSession(sessionId, userId);
   const ex = await prisma.exercise.findUnique({ where: { id: exerciseId } });
   if (!ex) throw new Error('Exercise not found');
+  // Ownership guard (mirrors getExercise): a custom exercise (ownerId set) belongs to
+  // exactly one user; library exercises (ownerId null) are shared. Without this a user
+  // could attach another user's private custom exercise by id (IDOR / info leak).
+  if (ex.ownerId && ex.ownerId !== userId) throw new AuthorizationError();
   const max = await prisma.sessionEntry.aggregate({ where: { sessionId }, _max: { order: true } });
   return prisma.sessionEntry.create({
     data: {
@@ -154,12 +161,28 @@ export async function updateEntryTargets(
 
 export async function reorderEntries(userId: string, sessionId: string, orderedEntryIds: string[]): Promise<void> {
   await ownedSession(sessionId, userId);
-  // Two-phase to avoid transient @@unique([sessionId, order]) collisions: park
-  // every row at a high offset first, then assign the final contiguous orders.
+  // The client sends the ids of the currently-visible (non-removed) entries in their new
+  // order. We load the session's real rows rather than trusting the list, and require it
+  // to be a permutation of the active set. Crucially, @@unique([sessionId, order]) spans
+  // soft-removed rows too: a removed entry keeps its old `order`, so naively assigning the
+  // active entries 0..n-1 can collide with it (P2002). We therefore renumber EVERY row —
+  // active entries take 0..n-1, removed ones are parked just after — all inside one
+  // two-phase transaction so there is never a transient duplicate-order collision.
+  const all = await prisma.sessionEntry.findMany({ where: { sessionId }, select: { id: true, isRemoved: true } });
+  const activeIds = all.filter((e) => !e.isRemoved).map((e) => e.id);
+  const activeSet = new Set(activeIds);
+  const ordered = orderedEntryIds.filter((id) => activeSet.has(id));
+  if (ordered.length !== activeIds.length || new Set(ordered).size !== activeIds.length) {
+    throw new Error("reorder list must be a permutation of the session's active entries");
+  }
+  const removedIds = all.filter((e) => e.isRemoved).map((e) => e.id);
   const OFFSET = 100000;
   await prisma.$transaction([
-    ...orderedEntryIds.map((id, i) => prisma.sessionEntry.update({ where: { id }, data: { order: i + OFFSET } })),
-    ...orderedEntryIds.map((id, i) => prisma.sessionEntry.update({ where: { id }, data: { order: i } })),
+    // Phase 1: park every row out of the active range.
+    ...all.map((e, i) => prisma.sessionEntry.update({ where: { id: e.id }, data: { order: i + OFFSET } })),
+    // Phase 2: active entries take the requested 0..n-1; removed rows follow, never colliding.
+    ...ordered.map((id, i) => prisma.sessionEntry.update({ where: { id }, data: { order: i } })),
+    ...removedIds.map((id, i) => prisma.sessionEntry.update({ where: { id }, data: { order: ordered.length + i } })),
   ]);
 }
 
@@ -175,7 +198,9 @@ export async function logSet(
   await prisma.setLog.upsert({
     where: { entryId_setIndex: { entryId, setIndex } },
     update: { ...data, ...(completedAt !== undefined ? { completedAt } : {}) },
-    create: { entryId, setIndex, ...data },
+    // Apply the derived completedAt on the create path too, so a set first written
+    // as completed:true (rather than updated) records its completion timestamp.
+    create: { entryId, setIndex, ...data, ...(completedAt !== undefined ? { completedAt } : {}) },
   });
 }
 
@@ -228,15 +253,30 @@ export async function finishSession(
   opts: { saveMode: SaveMode; newRoutineName?: string; bodyweightKg?: number; durationSec?: number; notes?: string } = { saveMode: 'NONE' },
 ): Promise<FinishResult> {
   const s = await ownedSession(sessionId, userId);
-  // Idempotency (W1-T4): finishing an already-COMPLETED session must not
-  // re-award XP/PRs (double-submit, retry, back-button). Short-circuit cleanly.
-  if (s.status === 'COMPLETED') {
+  // State guard (W1-T4): only an ACTIVE session can be finished. COMPLETED
+  // (double-submit/retry/back-button) and ABANDONED are terminal and must never
+  // re-award XP/PRs. The early return covers the common terminal case; the atomic
+  // claim below closes the TOCTOU window between two concurrent ACTIVE finishes.
+  if (s.status !== 'ACTIVE') {
     return { newPrs: [], routineId: s.routineId ?? undefined, award: null };
   }
   const entries = await prisma.sessionEntry.findMany({ where: { sessionId, isRemoved: false }, orderBy: { order: 'asc' } });
 
-  let resultRoutineId: string | undefined;
+  const durationSec = opts.durationSec ?? Math.max(0, Math.round((Date.now() - s.startedAt.getTime()) / 1000));
+  // Atomic claim FIRST: flip ACTIVE -> COMPLETED in a single conditional write. Two
+  // concurrent finishes both pass the guard above, but only one updateMany sees
+  // status:'ACTIVE' and gets count===1; the loser bails here — before any routine is
+  // created — so a double-submit can never leave a duplicate/orphan routine behind.
+  const claimed = await prisma.workoutSession.updateMany({
+    where: { id: sessionId, status: 'ACTIVE' },
+    data: { status: 'COMPLETED', completedAt: new Date(), durationSec, bodyweightKg: opts.bodyweightKg, notes: opts.notes, restTimer: Prisma.JsonNull },
+  });
+  if (claimed.count !== 1) {
+    return { newPrs: [], routineId: s.routineId ?? undefined, award: null };
+  }
 
+  // Only the winner of the claim reaches here, so the routine save runs exactly once.
+  let resultRoutineId: string | undefined;
   if (opts.saveMode === 'UPDATE_ROUTINE' && s.routineId) {
     await rebuildRoutineItems(s.routineId, entries);
     await prisma.routine.update({ where: { id: s.routineId }, data: { updatedAt: new Date() } });
@@ -249,14 +289,18 @@ export async function finishSession(
     resultRoutineId = routine.id;
   }
 
-  const durationSec = opts.durationSec ?? Math.max(0, Math.round((Date.now() - s.startedAt.getTime()) / 1000));
-  await prisma.workoutSession.update({
-    where: { id: sessionId },
-    data: { status: 'COMPLETED', completedAt: new Date(), durationSec, bodyweightKg: opts.bodyweightKg, notes: opts.notes, restTimer: Prisma.JsonNull },
+  // Both are idempotent (applySessionPrs upserts only on improvement; awardForWorkout
+  // dedupes on XpEvent.workoutId), so a crash here can be recovered by re-running
+  // without double-crediting. Errors are logged — never silently swallowed — so XP/PR
+  // loss is visible in ops rather than disappearing.
+  const newPrs = await applySessionPrs(userId, sessionId).catch((err): NewPr[] => {
+    logger.error({ err, userId, sessionId }, '[finishSession] applySessionPrs failed');
+    return [];
   });
-
-  const newPrs = await applySessionPrs(userId, sessionId);
-  const award = await awardForWorkout(userId, sessionId, newPrs.length).catch(() => null);
+  const award = await awardForWorkout(userId, sessionId, newPrs.length).catch((err) => {
+    logger.error({ err, userId, sessionId }, '[finishSession] awardForWorkout failed');
+    return null;
+  });
 
   // Social: activity feed + friend streaks (best-effort, never block the finish).
   try {
@@ -266,28 +310,32 @@ export async function finishSession(
     if (newPrs.length > 0) await writeActivity(userId, 'PR', { count: newPrs.length });
     if (award?.leveledUp) await writeActivity(userId, 'LEVEL_UP', { level: award.newLevel });
     await evaluateFriendStreaks(userId, dk);
-  } catch {
-    /* social side-effects are non-critical */
+  } catch (err) {
+    logger.warn({ err, userId, sessionId }, '[finishSession] social side-effects failed (non-critical)');
   }
 
   return { newPrs, routineId: resultRoutineId, award };
 }
 
 async function rebuildRoutineItems(routineId: string, entries: SessionEntry[]): Promise<void> {
-  await prisma.routineItem.deleteMany({ where: { routineId } });
-  await prisma.routineItem.createMany({
-    data: entries.map((e, i) => ({
-      routineId,
-      exerciseId: e.exerciseId,
-      order: i,
-      supersetGroup: e.supersetGroup,
-      targetSets: e.targetSets,
-      targetRepLow: e.targetRepLow,
-      targetRepHigh: e.targetRepHigh,
-      targetRestSec: e.targetRestSec,
-      targetRpe: e.targetRpe,
-    })),
-  });
+  // Wrap delete+create in one transaction so a crash/throw between them can never
+  // leave the routine permanently empty — it either fully rebuilds or rolls back.
+  await prisma.$transaction([
+    prisma.routineItem.deleteMany({ where: { routineId } }),
+    prisma.routineItem.createMany({
+      data: entries.map((e, i) => ({
+        routineId,
+        exerciseId: e.exerciseId,
+        order: i,
+        supersetGroup: e.supersetGroup,
+        targetSets: e.targetSets,
+        targetRepLow: e.targetRepLow,
+        targetRepHigh: e.targetRepHigh,
+        targetRestSec: e.targetRestSec,
+        targetRpe: e.targetRpe,
+      })),
+    }),
+  ]);
 }
 
 export async function abandonSession(userId: string, sessionId: string): Promise<void> {

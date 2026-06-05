@@ -9,6 +9,7 @@ import { Chip } from '@/components/ui/Chip';
 import { Btn } from '@/components/ui/Btn';
 import { Mono, SectionLabel } from '@/components/ui/typography';
 import { IconTile, type IconName } from '@/components/ui/Icon';
+import { formatWeight, weightUnit, kgToLb } from '@/domain/units';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
           <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{session.name ?? 'Workout'}</h1>
           <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
             <Chip><Mono>{completedSetCount(entries)}</Mono>&nbsp;sets</Chip>
-            <Chip><Mono>{sessionVolume(entries).toLocaleString()}</Mono>&nbsp;kg·reps</Chip>
+            <Chip><Mono>{Math.round(user.unitSystem === 'IMPERIAL' ? kgToLb(sessionVolume(entries)) : sessionVolume(entries)).toLocaleString()}</Mono>&nbsp;{weightUnit(user.unitSystem)}·reps</Chip>
             {session.durationSec != null && <Chip><Mono>{Math.round(session.durationSec / 60)}m</Mono></Chip>}
           </div>
         </div>
@@ -75,7 +76,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
             {e.sets.filter((s) => s.completed).map((s) => (
               <div key={s.setIndex} style={{ display: 'flex', gap: 16, padding: '8px var(--pad)', borderTop: '1px solid var(--line)', fontSize: 13.5 }}>
                 <Mono style={{ color: 'var(--text-3)', width: 24 }}>{s.setIndex}</Mono>
-                <Mono>{s.weightKg ?? '—'} kg</Mono>
+                <Mono>{s.weightKg == null ? '—' : `${formatWeight(s.weightKg, user.unitSystem)} ${weightUnit(user.unitSystem)}`}</Mono>
                 <Mono>{s.reps ?? '—'} reps</Mono>
                 {s.rpe != null && <Mono style={{ color: 'var(--text-3)' }}>RPE {s.rpe}</Mono>}
               </div>

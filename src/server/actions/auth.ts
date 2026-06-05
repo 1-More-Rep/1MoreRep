@@ -12,6 +12,7 @@ import { audit } from '@/lib/auth/audit';
 import { sendMagicLink } from '@/lib/mail';
 import { getRequestContext } from '@/lib/request';
 import { rateLimit } from '@/lib/ratelimit';
+import { logger } from '@/lib/logger';
 import { LOGIN_LOCK_THRESHOLD, LOGIN_LOCK_DURATION_MS } from '@/lib/auth/constants';
 import { loginSchema, magicRequestSchema, registerSchema, resetRequestSchema, setPasswordSchema } from '@/lib/validation/auth';
 
@@ -56,6 +57,14 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
     });
     await audit({ actorId: user.id, action: 'auth.login.fail', ip: ctx.ip });
     return genericFail;
+  }
+
+  // Correct password, but the account never verified its email (self-registered while
+  // requireEmailVerification was on → status INVITED). Do NOT establish a session here:
+  // password login must not be a path around email verification.
+  if (user.status === 'INVITED') {
+    await audit({ actorId: user.id, action: 'auth.login.unverified', ip: ctx.ip });
+    return { error: 'Verify your email before signing in — check your inbox for the link.' };
   }
 
   await prisma.user.update({
@@ -125,7 +134,14 @@ export async function registerAction(_prev: ActionState, formData: FormData): Pr
 
   if (requireVerify) {
     const { url } = await issueToken('EMAIL_VERIFY', user.id, { ip: ctx.ip });
-    await sendMagicLink('EMAIL_VERIFY', email, url);
+    // The account already exists (INVITED); a failed verification email shouldn't surface as a
+    // raw 500. Tell the user it couldn't be sent so they can retry/contact the admin.
+    try {
+      await sendMagicLink('EMAIL_VERIFY', email, url);
+    } catch (err) {
+      logger.error({ err }, '[auth] verification email failed to send during registration');
+      return { ok: true, notice: 'Account created, but the verification email could not be sent. Contact the administrator to verify your account.' };
+    }
     return { ok: true, notice: 'Account created. Check your email to verify before signing in.' };
   }
 
@@ -145,13 +161,16 @@ export async function resetRequestAction(_prev: ActionState, formData: FormData)
     if (user && user.status !== 'DEACTIVATED') {
       const { url } = await issueToken('PASSWORD_RESET', user.id, { ip: ctx.ip });
       await sendMagicLink('PASSWORD_RESET', email, url);
+      await audit({ actorId: user.id, action: 'auth.reset.request', ip: ctx.ip });
     }
   }
   return { ok: true, notice: NEUTRAL };
 }
 
 export async function logoutAction(): Promise<void> {
+  const user = await getCurrentUser();
   await destroyCurrentSession();
+  if (user) await audit({ actorId: user.id, action: 'auth.logout' });
   redirect('/login');
 }
 
@@ -162,11 +181,31 @@ export async function logoutAction(): Promise<void> {
 export async function consumeCallbackAction(type: TokenType, rawToken: string): Promise<{ error?: string }> {
   const ctx = await getRequestContext();
   // Throttle token consumption per-IP (W1-T8) — brute-force defense beyond entropy.
-  const rl = await rateLimit.auth(`consume:${ctx.ip ?? 'noip'}`);
-  if (!rl.ok) return { error: 'Too many attempts. Try again shortly.' };
+  // Only when we actually have a client IP: without a trusted proxy (TRUST_PROXY=false)
+  // ctx.ip is null for everyone, so keying on a constant 'noip' would collapse all users
+  // into ONE shared 10/min bucket — a single client could then lock out every user's
+  // magic-link / reset / invite consumption (DoS). Tokens are 256-bit, single-use and
+  // hashed at rest, so entropy already defeats brute force; this limit is defense-in-depth.
+  if (ctx.ip) {
+    const rl = await rateLimit.auth(`consume:${ctx.ip}`);
+    if (!rl.ok) return { error: 'Too many attempts. Try again shortly.' };
+  }
   const result = await consumeToken(type, rawToken);
   if (!result) return { error: 'This link is invalid or has expired.' };
   const { userId, payload } = result;
+
+  // Re-check the account's current status at consume time. consumeToken validates the
+  // token but knows nothing about the user, so without this an outstanding token could:
+  //  (a) let a DEACTIVATED user reactivate themselves (INVITE/EMAIL_VERIFY flip to ACTIVE),
+  //      or get a session (LOGIN_LINK/PASSWORD_RESET) — i.e. reverse an admin deactivation;
+  //  (b) let an INVITED (email-unverified) user obtain a full session via LOGIN_LINK,
+  //      bypassing the email-verification gate that password login enforces (line 64).
+  const tokenUser = await prisma.user.findUnique({ where: { id: userId }, select: { status: true } });
+  if (!tokenUser) return { error: 'This link is invalid or has expired.' };
+  if (tokenUser.status === 'DEACTIVATED') return { error: 'This account has been deactivated.' };
+  if (type === 'LOGIN_LINK' && tokenUser.status !== 'ACTIVE') {
+    return { error: 'Verify your email before signing in — check your inbox for the verification link.' };
+  }
 
   switch (type) {
     case 'LOGIN_LINK': {
@@ -239,15 +278,23 @@ const VALID_TYPES: TokenType[] = ['LOGIN_LINK', 'INVITE', 'EMAIL_VERIFY', 'PASSW
 
 /** Form-bound confirm action for the auth callback (POST consumes the token). */
 export async function callbackConfirmAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const type = String(formData.get('type') ?? '') as TokenType;
+  const typeRaw = String(formData.get('type') ?? '');
   const token = String(formData.get('token') ?? '');
-  if (!VALID_TYPES.includes(type)) return { error: 'Invalid link.' };
+  // Validate membership BEFORE narrowing to TokenType — no unchecked `as` into the
+  // type system, the cast only happens once the value is proven to be a TokenType.
+  if (!VALID_TYPES.includes(typeRaw as TokenType)) return { error: 'Invalid link.' };
+  const type = typeRaw as TokenType;
   const r = await consumeCallbackAction(type, token);
   return r.error ? { error: r.error } : {};
 }
 
-/** Set a new password for the current authenticated session (reset/first-login). */
-export async function setPasswordAction(userId: string, formData: FormData): Promise<ActionState> {
+/**
+ * Set a new password for `userId`. INTERNAL helper — intentionally NOT exported, so
+ * it is never a callable server-action endpoint. The only caller is
+ * changePasswordAction, which derives userId from the authenticated session. Keeping
+ * it un-exported means there is no way to invoke it with an attacker-supplied userId.
+ */
+async function setPasswordForUser(userId: string, formData: FormData): Promise<ActionState> {
   const parsed = setPasswordSchema.safeParse({ password: formData.get('password') });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'Invalid password.' };
   await prisma.user.update({
@@ -267,7 +314,7 @@ export async function setPasswordAction(userId: string, formData: FormData): Pro
 export async function changePasswordAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await getCurrentUser();
   if (!user) return { error: 'Not signed in.' };
-  const result = await setPasswordAction(user.id, formData);
+  const result = await setPasswordForUser(user.id, formData);
   if (result.error) return result;
   redirect('/app');
 }

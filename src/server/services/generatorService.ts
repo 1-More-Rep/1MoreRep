@@ -1,6 +1,7 @@
 import 'server-only';
 import type { Equipment, ExCategory } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
+import { AuthorizationError } from '@/lib/auth/guards';
 import { computeAndCacheFatigue } from './fatigueService';
 import { generateWorkout, swapExercise } from '@/domain/generator/engine';
 import type { Experience, GenGoal, GeneratorInput, GeneratorPlan, PoolExercise } from '@/domain/generator/types';
@@ -130,8 +131,20 @@ export async function swapPlanExercise(userId: string, opts: GenerateOptions, pl
 
 /** Materialize a generated plan as a fresh ACTIVE session and return its id. */
 export async function createSessionFromPlan(userId: string, plan: GeneratorPlan, name = 'Generated workout', goal?: GenGoal): Promise<string> {
-  await prisma.workoutSession.updateMany({ where: { ownerId: userId, status: 'ACTIVE' }, data: { status: 'ABANDONED' } });
-  const session = await prisma.workoutSession.create({
+  // The plan round-trips through the browser, so its exerciseIds are untrusted. The FK only
+  // guarantees the exercise EXISTS — a private custom exercise owned by another user would
+  // satisfy it. Verify every id is a library exercise (ownerId null) or owned by this user,
+  // or a crafted plan could attach (and reveal) someone else's private exercise (IDOR).
+  const ids = [...new Set(plan.exercises.map((ex) => ex.exerciseId))];
+  if (ids.length === 0) throw new Error('Plan has no exercises.');
+  const okCount = await prisma.exercise.count({ where: { id: { in: ids }, OR: [{ ownerId: null }, { ownerId: userId }] } });
+  if (okCount !== ids.length) throw new AuthorizationError();
+
+  // Abandon the prior ACTIVE session and create the new one atomically, so a failed create
+  // can never abandon the in-progress workout without replacing it.
+  const session = await prisma.$transaction(async (tx) => {
+    await tx.workoutSession.updateMany({ where: { ownerId: userId, status: 'ACTIVE' }, data: { status: 'ABANDONED' } });
+    return tx.workoutSession.create({
     data: {
       ownerId: userId,
       name,
@@ -161,6 +174,7 @@ export async function createSessionFromPlan(userId: string, plan: GeneratorPlan,
         })),
       },
     },
+    });
   });
   return session.id;
 }

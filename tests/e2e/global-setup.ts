@@ -66,8 +66,12 @@ export default async function globalSetup() {
       );
     }
   } catch (e) {
+    // Fail loudly rather than swallowing: a setup error here (DB not ready, seed/settings
+    // failed) would otherwise let the whole authed suite run against an unprepared DB and
+    // surface as confusing downstream failures — or a misleading green. Abort with the cause.
     // eslint-disable-next-line no-console
-    console.warn('[e2e global-setup] DB not ready:', (e as Error).message);
+    console.error('[e2e global-setup] setup failed:', (e as Error).message);
+    throw e;
   } finally {
     await prisma.$disconnect();
   }
