@@ -1,0 +1,111 @@
+# 1MoreRep — example nginx reverse-proxy config (bring-your-own-proxy).
+#
+# Use this instead of the bundled Caddy profile when you want to front the app
+# with your own nginx. Before this works, set the following in .env and recreate
+# the stack (`docker compose up -d`):
+#
+#   APP_BIND=127.0.0.1        # publish the app on loopback only, so the plaintext
+#                             # port can't bypass nginx's TLS on the public interface
+#   APP_PORT=3000             # host port nginx proxies to (match `proxy_pass` below)
+#   TRUST_PROXY=true          # REQUIRED: lets the app read X-Forwarded-For / X-Real-IP
+#                             # (client IP is used for audit-log hashing + throttling)
+#   COMPOSE_PROFILES=         # leave empty so the Caddy proxy stays OFF
+#   APP_URL=https://gym.example.com   # your public https URL
+#
+# Then place this file at e.g. /etc/nginx/sites-available/1morerep, symlink it
+# into sites-enabled/, drop in your TLS certs, and `nginx -t && systemctl reload nginx`.
+#
+# NOTE: the app already sets all security headers itself (CSP with a per-request
+# nonce, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy,
+# Permissions-Policy) in src/middleware.ts — do NOT add them here. A second CSP
+# in particular would break the nonce'd inline scripts.
+
+# --- Connection-upgrade map (must live in the http{} context). ---------------
+# If you're including this file from inside http{} (sites-enabled), keep it here.
+# If your distro already defines $connection_upgrade globally, delete this block.
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# Upstream = the app, published by docker-compose on the host loopback (APP_BIND=127.0.0.1).
+# If you instead run nginx as a container on the same compose network, replace this
+# with `server app:3000;` and drop APP_BIND from .env.
+upstream onemorerep {
+    server 127.0.0.1:3000;   # 127.0.0.1:${APP_PORT}
+    keepalive 16;
+}
+
+# --- HTTP : redirect everything to HTTPS -------------------------------------
+server {
+    listen 80;
+    listen [::]:80;
+    server_name gym.example.com;
+
+    # Allow ACME http-01 challenges if you use certbot/webroot; otherwise remove.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 308 https://$host$request_uri;
+    }
+}
+
+# --- HTTPS : the real proxy --------------------------------------------------
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name gym.example.com;
+
+    # --- TLS (point these at your real certs; e.g. certbot or your own CA) ---
+    ssl_certificate     /etc/letsencrypt/live/gym.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/gym.example.com/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    # Progress-photo uploads go through Server Actions, whose body limit is 8mb
+    # (next.config.mjs → serverActions.bodySizeLimit). Give headroom for multipart
+    # overhead so large photos don't 413 at the proxy.
+    client_max_body_size 10m;
+
+    # The app compresses nothing itself (Next standalone); compress at the edge.
+    gzip            on;
+    gzip_vary       on;
+    gzip_proxied    any;
+    gzip_min_length 1024;
+    gzip_types
+        text/plain text/css application/json application/javascript
+        text/javascript application/xml application/manifest+json
+        image/svg+xml;
+
+    # --- Headers forwarded to the app (inherited by every location below) ----
+    proxy_http_version 1.1;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;            # read by the app when TRUST_PROXY=true
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;                 # so the app sees https
+    proxy_set_header X-Forwarded-Host  $host;
+    proxy_set_header Upgrade           $http_upgrade;
+    proxy_set_header Connection        $connection_upgrade;
+
+    # LLM-backed routine generation (optional Ollama) can be slow — be patient.
+    proxy_connect_timeout 10s;
+    proxy_send_timeout    300s;
+    proxy_read_timeout    300s;
+
+    # Immutable, content-hashed assets — let nginx serve the long-cache headers
+    # the app already stamps, and reuse upstream keepalives.
+    location /_next/static/ {
+        proxy_pass http://onemorerep;
+    }
+
+    location / {
+        proxy_pass http://onemorerep;
+        proxy_redirect off;
+    }
+}

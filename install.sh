@@ -10,13 +10,14 @@ ALLOW_ROOT=0
 ADMIN_EMAIL="${SUPERADMIN_EMAIL:-}"
 APP_URL_ARG="${APP_URL:-}"
 APP_PORT="${APP_PORT:-3000}"
+PORT_FLAG_SET=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --allow-root) ALLOW_ROOT=1 ;;
     --admin-email) ADMIN_EMAIL="$2"; shift ;;
     --app-url) APP_URL_ARG="$2"; shift ;;
-    --port) APP_PORT="$2"; shift ;;
+    --port) APP_PORT="$2"; PORT_FLAG_SET=1; shift ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
   shift
@@ -37,6 +38,16 @@ docker info >/dev/null 2>&1 || { err "The Docker daemon is not running."; exit 1
 # --- Secrets (.env) ---
 if [ -f .env ]; then
   log "Existing .env detected — keeping secrets (upgrade mode)."
+  # Upgrade keeps the committed config, so read the host port + URL back from the
+  # existing .env — otherwise the shell defaults above are stale and the health
+  # check below would poll the wrong port (false "not healthy"). Changing the port
+  # on an existing install means editing APP_PORT in .env directly, so flag --port
+  # as ineffective if it was passed here.
+  [ "$PORT_FLAG_SET" = 1 ] && log "Note: --port is ignored in upgrade mode; edit APP_PORT in .env to change the port."
+  ENV_PORT="$(sed -n 's/^APP_PORT=//p' .env | head -n1)"
+  [ -n "$ENV_PORT" ] && APP_PORT="$ENV_PORT"
+  ENV_URL="$(sed -n 's/^APP_URL=//p' .env | head -n1)"
+  [ -n "$ENV_URL" ] && APP_URL_ARG="$ENV_URL"
 else
   log "Fresh install — generating secrets…"
   [ -z "$APP_URL_ARG" ] && read -r -p "Public URL (e.g. https://gym.example.com) [http://localhost:${APP_PORT}]: " APP_URL_ARG
