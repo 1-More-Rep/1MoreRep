@@ -1,20 +1,22 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useTranslations, useLocale } from 'next-intl';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
 import { Btn } from '@/components/ui/Btn';
 import { Icon } from '@/components/ui/Icon';
 import { Mono, SectionLabel } from '@/components/ui/typography';
 
-const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-const MONTH_FMT = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
-
 /**
  * `activeDays` / `todayKey` are 'YYYY-MM-DD' keys computed server-side in the
  * user's timezone, so the grid stays tz-correct regardless of the browser tz.
  */
 export function HistoryCalendar({ activeDays, currentStreak, todayKey }: { activeDays: string[]; currentStreak: number; todayKey: string }) {
+  const t = useTranslations('history');
+  const locale = useLocale();
+  const weekdays = t('weekdays').split(',');
+  const monthFmt = useMemo(() => new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }), [locale]);
   const active = useMemo(() => new Set(activeDays), [activeDays]);
   // `cursor` is the first of the displayed month, seeded from today's key.
   const [ty, tm] = todayKey.split('-').map(Number);
@@ -35,24 +37,24 @@ export function HistoryCalendar({ activeDays, currentStreak, todayKey }: { activ
   return (
     <Card>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 8 }}>
-        <SectionLabel>{MONTH_FMT.format(cursor)}</SectionLabel>
+        <SectionLabel>{monthFmt.format(cursor)}</SectionLabel>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {currentStreak > 0 && (
             <Chip accent>
-              <Icon name="flame" size={13} /> <Mono>{currentStreak}</Mono>&nbsp;day streak
+              <Icon name="flame" size={13} /> <Mono>{currentStreak}</Mono>&nbsp;{t('dayStreak')}
             </Chip>
           )}
-          <Btn kind="soft" size="sm" aria-label="Previous month" onClick={() => shift(-1)} style={{ padding: '0 12px', fontSize: 17 }}>
+          <Btn kind="soft" size="sm" aria-label={t('prevMonth')} onClick={() => shift(-1)} style={{ padding: '0 12px', fontSize: 17 }}>
             ‹
           </Btn>
-          <Btn kind="soft" size="sm" aria-label="Next month" onClick={() => shift(1)} style={{ padding: '0 12px', fontSize: 17 }}>
+          <Btn kind="soft" size="sm" aria-label={t('nextMonth')} onClick={() => shift(1)} style={{ padding: '0 12px', fontSize: 17 }}>
             ›
           </Btn>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
-        {WEEKDAYS.map((w, i) => (
+        {weekdays.map((w, i) => (
           <div key={i} style={{ textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--text-3)' }}>{w}</div>
         ))}
         {cells.map((c, i) =>
@@ -61,7 +63,7 @@ export function HistoryCalendar({ activeDays, currentStreak, todayKey }: { activ
           ) : (
             <div
               key={c.key}
-              title={active.has(c.key) ? 'Workout completed' : undefined}
+              title={active.has(c.key) ? t('workoutCompleted') : undefined}
               style={{
                 aspectRatio: '1 / 1',
                 display: 'flex',

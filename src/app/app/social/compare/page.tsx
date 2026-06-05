@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { prisma } from '@/server/db/prisma';
 import { getPrivacy, canView } from '@/server/social/privacy';
@@ -10,6 +11,8 @@ import { weightUnit, kgToLb, type UnitSystemLike } from '@/domain/units';
 
 export const dynamic = 'force-dynamic';
 
+type Translator = Awaited<ReturnType<typeof getTranslations>>;
+
 interface Metric {
   label: string;
   format: (n: number) => string;
@@ -19,14 +22,14 @@ interface Metric {
 
 // Total volume is stored in kg; render it in the VIEWER's unit so both sides of the
 // comparison use the same unit (converting both preserves the leader ordering).
-function buildMetrics(system: UnitSystemLike): Metric[] {
+function buildMetrics(system: UnitSystemLike, t: Translator): Metric[] {
   return [
-    { label: 'Lifetime XP', format: (n) => n.toLocaleString(), value: (b) => b.stats.lifetimeXp },
-    { label: 'Level', format: (n) => String(n), value: (b) => b.progress.level },
-    { label: 'Current streak', format: (n) => `${n} day${n === 1 ? '' : 's'}`, value: (b) => b.stats.currentStreak },
-    { label: 'Weekly XP', format: (n) => n.toLocaleString(), value: (b) => b.weeklyXp },
+    { label: t('metricLifetimeXp'), format: (n) => n.toLocaleString(), value: (b) => b.stats.lifetimeXp },
+    { label: t('metricLevel'), format: (n) => String(n), value: (b) => b.progress.level },
+    { label: t('metricCurrentStreak'), format: (n) => t('dayCount', { count: n }), value: (b) => b.stats.currentStreak },
+    { label: t('metricWeeklyXp'), format: (n) => n.toLocaleString(), value: (b) => b.weeklyXp },
     {
-      label: 'Total volume',
+      label: t('metricTotalVolume'),
       format: (n) => `${Math.round(n).toLocaleString()} ${weightUnit(system)}`,
       value: (b) => {
         const kgReps = Number(b.stats.totalVolume) / 100;
@@ -36,11 +39,11 @@ function buildMetrics(system: UnitSystemLike): Metric[] {
   ];
 }
 
-function EmptyState({ message }: { message: string }) {
+function EmptyState({ message, t }: { message: string; t: Translator }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
-      <Link href="/app/social" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← Social</Link>
-      <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>Compare</h1>
+      <Link href="/app/social" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← {t('title')}</Link>
+      <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{t('compareTitle')}</h1>
       <Card soft><span style={{ color: 'var(--text-3)' }}>{message}</span></Card>
     </div>
   );
@@ -49,16 +52,17 @@ function EmptyState({ message }: { message: string }) {
 export default async function ComparePage({ searchParams }: { searchParams: Promise<{ with?: string }> }) {
   const viewer = await requireUser();
   const { with: withHandle } = await searchParams;
+  const t = await getTranslations('social');
 
   // No target → friend picker.
   if (!withHandle) {
     const friends = await listFriends(viewer.id);
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
-        <Link href="/app/social" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← Social</Link>
-        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>Compare</h1>
-        <SectionLabel>Pick a friend</SectionLabel>
-        {friends.length === 0 && <Card soft><span style={{ color: 'var(--text-3)' }}>Add a friend first to compare your progress.</span></Card>}
+        <Link href="/app/social" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← {t('title')}</Link>
+        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{t('compareTitle')}</h1>
+        <SectionLabel>{t('comparePickFriend')}</SectionLabel>
+        {friends.length === 0 && <Card soft><span style={{ color: 'var(--text-3)' }}>{t('compareNoFriends')}</span></Card>}
         {friends.map((f) =>
           f.publicHandle ? (
             <Link key={f.id} href={`/app/social/compare?with=${encodeURIComponent(f.publicHandle)}`} style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -81,30 +85,30 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
     select: { id: true, displayName: true, publicHandle: true, status: true },
   });
   if (!friend || friend.status !== 'ACTIVE' || friend.id === viewer.id) {
-    return <EmptyState message="That profile isn't available to compare." />;
+    return <EmptyState message={t('compareUnavailable')} t={t} />;
   }
   if (!(await areFriends(viewer.id, friend.id))) {
-    return <EmptyState message="You can only compare stats with friends." />;
+    return <EmptyState message={t('compareFriendsOnly')} t={t} />;
   }
 
   const privacy = await getPrivacy(friend.id);
   if (!(await canView(viewer.id, friend.id, privacy.showStats))) {
-    return <EmptyState message="This friend keeps their stats private." />;
+    return <EmptyState message={t('comparePrivate')} t={t} />;
   }
 
   const [me, them] = await Promise.all([getStatsBundle(viewer.id), getStatsBundle(friend.id)]);
-  const METRICS = buildMetrics(viewer.unitSystem);
+  const METRICS = buildMetrics(viewer.unitSystem, t);
   const myName = viewer.publicHandle ? `@${viewer.publicHandle}` : viewer.displayName;
   const theirName = friend.publicHandle ? `@${friend.publicHandle}` : friend.displayName;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
       <Link href={friend.publicHandle ? `/app/u/${friend.publicHandle}` : '/app/social'} style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← {theirName}</Link>
-      <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>Compare</h1>
+      <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{t('compareTitle')}</h1>
       <Card pad={false}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, padding: 'var(--row) var(--pad)', borderBottom: '1px solid var(--line)', alignItems: 'center' }}>
           <div style={{ fontSize: 13, fontWeight: 700, textAlign: 'right' }}>{myName}</div>
-          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>vs</div>
+          <div style={{ fontSize: 11, color: 'var(--text-3)' }}>{t('compareVs')}</div>
           <div style={{ fontSize: 13, fontWeight: 700, textAlign: 'left' }}>{theirName}</div>
         </div>
         {METRICS.map((m, i) => {
@@ -133,7 +137,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Prom
           );
         })}
       </Card>
-      <SectionLabel style={{ textAlign: 'center', color: 'var(--text-3)' }}>Friendly progress, not a contest.</SectionLabel>
+      <SectionLabel style={{ textAlign: 'center', color: 'var(--text-3)' }}>{t('compareFooter')}</SectionLabel>
     </div>
   );
 }

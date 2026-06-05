@@ -2,11 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { setRoutineArchivedAction } from '@/server/actions/routines';
 import { Btn, useToast } from '@/components/ui';
 
 /** Restore an archived routine back to the active list. */
 export function UnarchiveButton({ routineId, name }: { routineId: string; name: string }) {
+  const t = useTranslations('routine');
   const router = useRouter();
   const { toast } = useToast();
   const [pending, start] = useTransition();
@@ -19,12 +21,12 @@ export function UnarchiveButton({ routineId, name }: { routineId: string; name: 
       onClick={() =>
         start(async () => {
           await setRoutineArchivedAction(routineId, false);
-          toast(`Restored “${name}”.`, 'success');
+          toast(t('restored', { name }), 'success');
           router.refresh();
         })
       }
     >
-      {pending ? 'Restoring…' : 'Restore'}
+      {pending ? t('restoring') : t('restore')}
     </Btn>
   );
 }

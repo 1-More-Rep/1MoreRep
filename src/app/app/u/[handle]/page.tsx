@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { prisma } from '@/server/db/prisma';
 import { getPrivacy, canView } from '@/server/social/privacy';
@@ -14,6 +15,7 @@ const initials = (n: string) => n.split(/\s+/).map((p) => p[0]).slice(0, 2).join
 export default async function PublicProfilePage({ params }: { params: Promise<{ handle: string }> }) {
   const viewer = await requireUser();
   const { handle } = await params;
+  const t = await getTranslations('social');
   const target = await prisma.user.findUnique({
     where: { publicHandle: handle },
     select: { id: true, displayName: true, publicHandle: true, status: true, stats: true },
@@ -40,7 +42,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
 
       {status === 'ACCEPTED' && target.publicHandle && (
         <Btn href={`/app/social/compare?with=${encodeURIComponent(target.publicHandle)}`} kind="soft" icon="target" style={{ alignSelf: 'flex-start' }}>
-          Compare stats
+          {t('profileCompareStats')}
         </Btn>
       )}
 
@@ -49,22 +51,22 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
           <Card style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
             <Ring pct={progress.pct} size={88}>
               <Mono style={{ fontSize: 22, fontWeight: 700 }}>{progress.level}</Mono>
-              <span style={{ fontSize: 9, color: 'var(--text-3)' }}>level</span>
+              <span style={{ fontSize: 9, color: 'var(--text-3)' }}>{t('profileLevel')}</span>
             </Ring>
             <div>
-              <Chip accent>{target.stats.leagueTier.toLowerCase()} league</Chip>
+              <Chip accent>{t('profileLeague', { tier: target.stats.leagueTier.toLowerCase() })}</Chip>
               <div style={{ fontSize: 13, color: 'var(--text-2)', marginTop: 8 }}>
-                <Mono>{target.stats.currentStreak}</Mono> day streak · <Mono>{target.stats.totalSessions}</Mono> sessions
+                <Mono>{target.stats.currentStreak}</Mono> {t('profileDayStreak')} · <Mono>{target.stats.totalSessions}</Mono> {t('profileSessions')}
               </div>
             </div>
           </Card>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--gap)' }}>
-            <Card><SectionLabel>Lifetime XP</SectionLabel><Mono style={{ fontSize: 22, fontWeight: 700, display: 'block', marginTop: 6 }}>{target.stats.lifetimeXp.toLocaleString()}</Mono></Card>
-            <Card><SectionLabel>Longest streak</SectionLabel><Mono style={{ fontSize: 22, fontWeight: 700, display: 'block', marginTop: 6 }}>{target.stats.longestStreak}</Mono></Card>
+            <Card><SectionLabel>{t('metricLifetimeXp')}</SectionLabel><Mono style={{ fontSize: 22, fontWeight: 700, display: 'block', marginTop: 6 }}>{target.stats.lifetimeXp.toLocaleString()}</Mono></Card>
+            <Card><SectionLabel>{t('profileLongestStreak')}</SectionLabel><Mono style={{ fontSize: 22, fontWeight: 700, display: 'block', marginTop: 6 }}>{target.stats.longestStreak}</Mono></Card>
           </div>
         </>
       ) : (
-        <Card soft><span style={{ color: 'var(--text-3)' }}>This profile&apos;s stats are private. {status === 'NONE' ? 'Add them as a friend to see more.' : ''}</span></Card>
+        <Card soft><span style={{ color: 'var(--text-3)' }}>{t('profilePrivate')} {status === 'NONE' ? t('profilePrivateAddFriend') : ''}</span></Card>
       )}
     </div>
   );

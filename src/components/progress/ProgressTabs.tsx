@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { LineChart, type ChartPoint } from '@/components/charts/LineChart';
 import { SectionLabel } from '@/components/ui/typography';
 
@@ -21,10 +22,10 @@ export interface ProgressTabsProps {
 }
 
 const TABS = [
-  { id: 'volume', label: 'Volume' },
-  { id: '1rm', label: '1RM' },
-  { id: 'bodyweight', label: 'Bodyweight' },
-  { id: 'measurements', label: 'Measurements' },
+  { id: 'volume', labelKey: 'tabVolume' },
+  { id: '1rm', labelKey: 'tab1rm' },
+  { id: 'bodyweight', labelKey: 'tabBodyweight' },
+  { id: 'measurements', labelKey: 'tabMeasurements' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -34,6 +35,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 export function ProgressTabs({ volume, bodyweight, oneRm, measurements, weightUnit, lengthUnit }: ProgressTabsProps) {
+  const t = useTranslations('progress');
   const [tab, setTab] = useState<TabId>('volume');
 
   // Roving-tabindex keyboard support (WAI-ARIA tabs): only the active tab is in the Tab
@@ -56,20 +58,20 @@ export function ProgressTabs({ volume, bodyweight, oneRm, measurements, weightUn
     <div>
       <div
         role="tablist"
-        aria-label="Progress metric"
+        aria-label={t('metricTablistLabel')}
         style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--surface-2)', borderRadius: 'var(--r-pill)', marginBottom: 16 }}
       >
-        {TABS.map((t, i) => {
-          const selected = tab === t.id;
+        {TABS.map((tabItem, i) => {
+          const selected = tab === tabItem.id;
           return (
             <button
-              key={t.id}
+              key={tabItem.id}
               role="tab"
-              id={`progtab-${t.id}`}
+              id={`progtab-${tabItem.id}`}
               aria-selected={selected}
-              aria-controls={`progpanel-${t.id}`}
+              aria-controls={`progpanel-${tabItem.id}`}
               tabIndex={selected ? 0 : -1}
-              onClick={() => setTab(t.id)}
+              onClick={() => setTab(tabItem.id)}
               onKeyDown={(e) => onTabKey(e, i)}
               style={{
                 flex: 1,
@@ -86,25 +88,25 @@ export function ProgressTabs({ volume, bodyweight, oneRm, measurements, weightUn
                 transition: 'background .15s, color .15s',
               }}
             >
-              {t.label}
+              {t(tabItem.labelKey)}
             </button>
           );
         })}
       </div>
 
       <div role="tabpanel" id="progpanel-volume" aria-labelledby="progtab-volume" hidden={tab !== 'volume'}>
-        <SectionLabel style={{ marginBottom: 12 }}>Session volume</SectionLabel>
-        <LineChart points={volume} unit={`${weightUnit}·reps`} />
+        <SectionLabel style={{ marginBottom: 12 }}>{t('sessionVolume')}</SectionLabel>
+        <LineChart points={volume} unit={`${weightUnit}·${t('repsUnit')}`} />
       </div>
 
       <div role="tabpanel" id="progpanel-1rm" aria-labelledby="progtab-1rm" hidden={tab !== '1rm'}>
-        <SectionLabel style={{ marginBottom: 12 }}>Est. 1RM{oneRm.exerciseName ? ` — ${oneRm.exerciseName}` : ''}</SectionLabel>
-        {oneRm.points.length > 0 ? <LineChart points={oneRm.points} unit={weightUnit} /> : <Empty>No estimated-1RM records yet — log some heavy sets.</Empty>}
+        <SectionLabel style={{ marginBottom: 12 }}>{oneRm.exerciseName ? t('est1rmFor', { exercise: oneRm.exerciseName }) : t('est1rm')}</SectionLabel>
+        {oneRm.points.length > 0 ? <LineChart points={oneRm.points} unit={weightUnit} /> : <Empty>{t('empty1rm')}</Empty>}
       </div>
 
       <div role="tabpanel" id="progpanel-bodyweight" aria-labelledby="progtab-bodyweight" hidden={tab !== 'bodyweight'}>
-        <SectionLabel style={{ marginBottom: 12 }}>Bodyweight</SectionLabel>
-        {bodyweight.length > 0 ? <LineChart points={bodyweight} unit={weightUnit} /> : <Empty>No bodyweight logged yet.</Empty>}
+        <SectionLabel style={{ marginBottom: 12 }}>{t('tabBodyweight')}</SectionLabel>
+        {bodyweight.length > 0 ? <LineChart points={bodyweight} unit={weightUnit} /> : <Empty>{t('emptyBodyweight')}</Empty>}
       </div>
 
       <div role="tabpanel" id="progpanel-measurements" aria-labelledby="progtab-measurements" hidden={tab !== 'measurements'}>
@@ -118,7 +120,7 @@ export function ProgressTabs({ volume, bodyweight, oneRm, measurements, weightUn
             ))}
           </div>
         ) : (
-          <Empty>No body measurements logged yet.</Empty>
+          <Empty>{t('emptyMeasurements')}</Empty>
         )}
       </div>
     </div>

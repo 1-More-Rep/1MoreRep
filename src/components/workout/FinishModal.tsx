@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { finishWorkoutAction, getWorkoutDiffAction } from '@/server/actions/workout';
 import type { RoutineDiff } from '@/domain/routine/diff';
 import type { SaveMode } from '@/server/services/sessionService';
@@ -20,6 +21,7 @@ export function FinishModal({
   durationSec: number;
   onClose: () => void;
 }) {
+  const t = useTranslations('workout');
   const [diff, setDiff] = useState<RoutineDiff | null>(null);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState(defaultName);
@@ -86,7 +88,7 @@ export function FinishModal({
         // navigation (no throw here); a real failure rejects and is surfaced below.
         await finishWorkoutAction(sessionId, { saveMode, newRoutineName: name, durationSec, notes: notes.trim() || undefined });
       } catch {
-        setErr('Couldn’t finish your workout — check your connection and try again. Your sets are still saved.');
+        setErr(t('finishError'));
       }
     });
   }
@@ -94,47 +96,47 @@ export function FinishModal({
   const dirty = diff?.isDirty ?? false;
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Finish workout" style={overlay} onClick={onClose}>
+    <div role="dialog" aria-modal="true" aria-label={t('finishWorkout')} style={overlay} onClick={onClose}>
       <div ref={sheetRef} style={sheet} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>Finish workout</h2>
+        <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px' }}>{t('finishWorkout')}</h2>
 
         {loading ? (
-          <p style={{ color: 'var(--text-3)' }}>Checking changes…</p>
+          <p style={{ color: 'var(--text-3)' }}>{t('checkingChanges')}</p>
         ) : fromRoutine && dirty ? (
           <>
             <p style={{ fontSize: 14, color: 'var(--text-2)', margin: '0 0 14px' }}>
-              You changed this workout. Save the changes back to the routine?
+              {t('changedPrompt')}
             </p>
             {diff && <DiffSummary diff={diff} />}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14 }}>
-              <Btn full icon="check" disabled={pending} onClick={() => finish('UPDATE_ROUTINE')}>Save changes to routine</Btn>
-              <Btn kind="soft" full disabled={pending} onClick={() => finish('NEW_ROUTINE')}>Save as a new routine</Btn>
-              <Btn kind="ghost" full disabled={pending} onClick={() => finish('NONE')}>Don&apos;t save changes</Btn>
+              <Btn full icon="check" disabled={pending} onClick={() => finish('UPDATE_ROUTINE')}>{t('saveChangesToRoutine')}</Btn>
+              <Btn kind="soft" full disabled={pending} onClick={() => finish('NEW_ROUTINE')}>{t('saveAsNewRoutineLong')}</Btn>
+              <Btn kind="ghost" full disabled={pending} onClick={() => finish('NONE')}>{t('dontSaveChanges')}</Btn>
             </div>
           </>
         ) : fromRoutine ? (
           <>
-            <p style={{ fontSize: 14, color: 'var(--text-2)', margin: '0 0 14px' }}>No changes to the routine. Finish and log this session?</p>
-            <Btn full icon="check" disabled={pending} onClick={() => finish('NONE')}>Finish</Btn>
+            <p style={{ fontSize: 14, color: 'var(--text-2)', margin: '0 0 14px' }}>{t('noChangesPrompt')}</p>
+            <Btn full icon="check" disabled={pending} onClick={() => finish('NONE')}>{t('finish')}</Btn>
           </>
         ) : (
           <>
-            <p style={{ fontSize: 14, color: 'var(--text-2)', margin: '0 0 14px' }}>Save these exercises as a new routine?</p>
-            <input value={name} onChange={(e) => setName(e.target.value)} aria-label="Routine name" placeholder="Routine name" style={input} />
+            <p style={{ fontSize: 14, color: 'var(--text-2)', margin: '0 0 14px' }}>{t('saveAsRoutinePrompt')}</p>
+            <input value={name} onChange={(e) => setName(e.target.value)} aria-label={t('routineName')} placeholder={t('routineName')} style={input} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-              <Btn full icon="check" disabled={pending} onClick={() => finish('NEW_ROUTINE')}>Save as new routine</Btn>
-              <Btn kind="ghost" full disabled={pending} onClick={() => finish('NONE')}>Just finish</Btn>
+              <Btn full icon="check" disabled={pending} onClick={() => finish('NEW_ROUTINE')}>{t('saveAsNewRoutine')}</Btn>
+              <Btn kind="ghost" full disabled={pending} onClick={() => finish('NONE')}>{t('justFinish')}</Btn>
             </div>
           </>
         )}
 
         {!loading && (
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 14 }}>
-            <SectionLabel>Notes (optional)</SectionLabel>
+            <SectionLabel>{t('notesOptional')}</SectionLabel>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="How did it feel? Anything to remember next time…"
+              placeholder={t('notesPlaceholder')}
               rows={2}
               style={{ ...input, height: 'auto', minHeight: 56, padding: 10, resize: 'vertical', fontFamily: 'var(--font-sans)', lineHeight: 1.4 }}
             />
@@ -148,7 +150,7 @@ export function FinishModal({
         )}
 
         <button onClick={onClose} disabled={pending} style={{ marginTop: 12, background: 'none', border: 'none', color: 'var(--text-3)', fontSize: 13, cursor: 'pointer', width: '100%' }}>
-          Keep training
+          {t('keepTraining')}
         </button>
       </div>
     </div>
@@ -156,15 +158,16 @@ export function FinishModal({
 }
 
 function DiffSummary({ diff }: { diff: RoutineDiff }) {
+  const t = useTranslations('workout');
   const parts: string[] = [];
-  if (diff.added.length) parts.push(`${diff.added.length} added`);
-  if (diff.removed.length) parts.push(`${diff.removed.length} removed`);
-  if (diff.modified.length) parts.push(`${diff.modified.length} changed`);
-  if (diff.reordered) parts.push('reordered');
+  if (diff.added.length) parts.push(t('diffAdded', { count: diff.added.length }));
+  if (diff.removed.length) parts.push(t('diffRemoved', { count: diff.removed.length }));
+  if (diff.modified.length) parts.push(t('diffChanged', { count: diff.modified.length }));
+  if (diff.reordered) parts.push(t('diffReordered'));
   return (
     <div style={{ background: 'var(--surface-2)', borderRadius: 'var(--r-sm)', padding: 12 }}>
-      <SectionLabel>Changes</SectionLabel>
-      <div style={{ fontSize: 13.5, color: 'var(--text-2)', marginTop: 6 }}>{parts.join(' · ') || 'None'}</div>
+      <SectionLabel>{t('changes')}</SectionLabel>
+      <div style={{ fontSize: 13.5, color: 'var(--text-2)', marginTop: 6 }}>{parts.join(' · ') || t('diffNone')}</div>
     </div>
   );
 }

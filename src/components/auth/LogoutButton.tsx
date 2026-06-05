@@ -1,9 +1,11 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { logoutAction } from '@/server/actions/auth';
 import { Icon } from '@/components/ui/Icon';
 
 export function LogoutButton() {
+  const t = useTranslations('auth');
   return (
     <form action={logoutAction}>
       <button
@@ -24,7 +26,7 @@ export function LogoutButton() {
         }}
       >
         <Icon name="arrowR" size={19} stroke={1.8} />
-        Log out
+        {t('logOut')}
       </button>
     </form>
   );

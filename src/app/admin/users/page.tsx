@@ -1,3 +1,4 @@
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/server/db/prisma';
 import { getCurrentUser } from '@/lib/auth/guards';
 import { Card } from '@/components/ui/Card';
@@ -7,19 +8,20 @@ import { InviteForm, UserActions } from '@/components/admin/AdminUi';
 
 export const dynamic = 'force-dynamic';
 
-const STATUS_LABEL: Record<string, string> = { ACTIVE: 'Active', INVITED: 'Invited', DEACTIVATED: 'Disabled' };
-
 export default async function AdminUsersPage() {
+  const t = await getTranslations('admin');
+  const STATUS_LABEL: Record<string, string> = { ACTIVE: t('statusActive'), INVITED: t('statusInvited'), DEACTIVATED: t('statusDisabled') };
+  const ROLE_LABEL: Record<string, string> = { USER: t('roleUser'), ADMIN: t('roleAdmin'), SUPERADMIN: t('roleSuperadmin') };
   const actor = await getCurrentUser();
   const isSuper = actor?.role === 'SUPERADMIN';
   const users = await prisma.user.findMany({ orderBy: [{ role: 'desc' }, { createdAt: 'asc' }] });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Users</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>{t('usersTitle')}</h1>
 
       <Card>
-        <SectionLabel style={{ marginBottom: 14 }}>Invite a user</SectionLabel>
+        <SectionLabel style={{ marginBottom: 14 }}>{t('inviteAUser')}</SectionLabel>
         <InviteForm canInviteAdmin={isSuper} />
       </Card>
 
@@ -41,7 +43,7 @@ export default async function AdminUsersPage() {
               <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{u.email}</div>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              <Chip accent={u.role !== 'USER'}>{u.role.toLowerCase()}</Chip>
+              <Chip accent={u.role !== 'USER'}>{ROLE_LABEL[u.role] ?? u.role.toLowerCase()}</Chip>
               <Chip>{STATUS_LABEL[u.status] ?? u.status}</Chip>
             </div>
             <div style={{ marginLeft: 'auto' }}>

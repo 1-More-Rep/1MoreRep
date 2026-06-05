@@ -1,6 +1,7 @@
 'use client';
 
 import { useFormStatus } from 'react-dom';
+import { useTranslations } from 'next-intl';
 import type { InputHTMLAttributes } from 'react';
 import { Btn } from '@/components/ui/Btn';
 
@@ -55,9 +56,10 @@ export function Alert({ kind, children }: { kind: 'error' | 'notice'; children: 
 
 export function SubmitBtn({ children, icon }: { children: React.ReactNode; icon?: 'play' | 'check' | 'arrowR' }) {
   const { pending } = useFormStatus();
+  const t = useTranslations('auth');
   return (
     <Btn type="submit" full size="lg" icon={icon} disabled={pending}>
-      {pending ? 'Please wait…' : children}
+      {pending ? t('pleaseWait') : children}
     </Btn>
   );
 }

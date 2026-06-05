@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { listBodyMetrics } from '@/server/services/bodyMetricService';
 import { getHistory, sessionVolume } from '@/server/queries/sessions';
@@ -14,15 +15,16 @@ export const dynamic = 'force-dynamic';
 const short = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-const MEASUREMENT_FIELDS: { key: string; label: string }[] = [
-  { key: 'chest', label: 'Chest' },
-  { key: 'waist', label: 'Waist' },
-  { key: 'arms', label: 'Arms' },
-  { key: 'thighs', label: 'Thighs' },
-  { key: 'hips', label: 'Hips' },
+const MEASUREMENT_FIELDS: { key: string; labelKey: string }[] = [
+  { key: 'chest', labelKey: 'fieldChest' },
+  { key: 'waist', labelKey: 'fieldWaist' },
+  { key: 'arms', labelKey: 'fieldArms' },
+  { key: 'thighs', labelKey: 'fieldThighs' },
+  { key: 'hips', labelKey: 'fieldHips' },
 ];
 
 export default async function ProgressPage() {
+  const t = await getTranslations('progress');
   const user = await requireUser();
   const [metrics, history, topExerciseId] = await Promise.all([
     listBodyMetrics(user.id),
@@ -52,7 +54,7 @@ export default async function ProgressPage() {
   }
 
   // Measurements tab: one series per metric from the BodyMetric.measurements JSON.
-  const measurements: MeasurementSeries[] = MEASUREMENT_FIELDS.map(({ key, label }) => {
+  const measurements: MeasurementSeries[] = MEASUREMENT_FIELDS.map(({ key, labelKey }) => {
     const points: ChartPoint[] = [];
     for (const m of metrics) {
       const meas = (m.measurements ?? null) as Record<string, unknown> | null;
@@ -60,16 +62,16 @@ export default async function ProgressPage() {
       const value = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
       if (Number.isFinite(value)) points.push({ label: short(m.recordedAt), value: round1(len(value)) });
     }
-    return { key, label, points };
+    return { key, label: t(labelKey), points };
   }).filter((s) => s.points.length > 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>Progress</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{t('title')}</h1>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Link href="/app/progress/prs" style={{ textDecoration: 'none' }}><Chip><Icon name="trophy" size={13} /> PRs</Chip></Link>
-          <Link href="/app/progress/photos" style={{ textDecoration: 'none' }}><Chip><Icon name="user" size={13} /> Photos</Chip></Link>
+          <Link href="/app/progress/prs" style={{ textDecoration: 'none' }}><Chip><Icon name="trophy" size={13} /> {t('prsChip')}</Chip></Link>
+          <Link href="/app/progress/photos" style={{ textDecoration: 'none' }}><Chip><Icon name="user" size={13} /> {t('photosChip')}</Chip></Link>
         </div>
       </div>
 
@@ -78,7 +80,7 @@ export default async function ProgressPage() {
       </Card>
 
       <Card>
-        <SectionLabel style={{ marginBottom: 14 }}>Log body metrics</SectionLabel>
+        <SectionLabel style={{ marginBottom: 14 }}>{t('logBodyMetrics')}</SectionLabel>
         <BodyMetricForm unitSystem={sys} />
       </Card>
     </div>

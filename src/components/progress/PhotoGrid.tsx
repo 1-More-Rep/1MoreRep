@@ -1,6 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { deletePhotoAction } from '@/server/actions/progress';
 import { Btn } from '@/components/ui/Btn';
 
@@ -12,10 +13,11 @@ export interface PhotoLite {
 }
 
 export function PhotoGrid({ photos }: { photos: PhotoLite[] }) {
+  const t = useTranslations('progress');
   const [, start] = useTransition();
 
   function del(id: string) {
-    if (!window.confirm('Delete this progress photo? This cannot be undone.')) return;
+    if (!window.confirm(t('deleteConfirm'))) return;
     start(() => deletePhotoAction(id));
   }
 
@@ -26,7 +28,7 @@ export function PhotoGrid({ photos }: { photos: PhotoLite[] }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/api/photos/${p.id}`}
-            alt={`Progress ${p.takenAt.slice(0, 10)}`}
+            alt={t('photoAlt', { date: p.takenAt.slice(0, 10) })}
             width={p.width}
             height={p.height}
             loading="lazy"
@@ -36,7 +38,7 @@ export function PhotoGrid({ photos }: { photos: PhotoLite[] }) {
             kind="soft"
             size="sm"
             icon="x"
-            aria-label="Delete photo"
+            aria-label={t('deletePhoto')}
             onClick={() => del(p.id)}
             style={{ position: 'absolute', top: 6, right: 6, height: 30, padding: '0 8px', background: 'color-mix(in oklab, var(--surface) 80%, transparent)' }}
           />

@@ -1,3 +1,4 @@
+import { getTranslations } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { SetPasswordForm } from '@/components/auth/SetPasswordForm';
 import { Icon } from '@/components/ui/Icon';
@@ -9,7 +10,8 @@ export default async function SetPasswordPage({
 }) {
   await requireUser();
   const sp = await searchParams;
-  const heading = sp.welcome ? 'Set your password' : sp.reset ? 'Choose a new password' : 'Update password';
+  const t = await getTranslations('settingsPages');
+  const heading = sp.welcome ? t('passwordSetHeading') : sp.reset ? t('passwordChooseHeading') : t('passwordUpdateHeading');
 
   return (
     <main
@@ -57,7 +59,7 @@ export default async function SetPasswordPage({
       >
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-.01em', margin: 0 }}>{heading}</h1>
-          <p style={{ fontSize: 14, color: 'var(--text-2)', margin: '6px 0 0' }}>Use at least 10 characters.</p>
+          <p style={{ fontSize: 14, color: 'var(--text-2)', margin: '6px 0 0' }}>{t('passwordMinChars')}</p>
         </div>
         <SetPasswordForm />
       </div>

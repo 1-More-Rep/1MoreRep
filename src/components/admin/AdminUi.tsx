@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { useTranslations } from 'next-intl';
 import type { Role } from '@prisma/client';
 import {
   inviteUserAction,
@@ -17,6 +18,7 @@ import { Alert, TextField } from '@/components/auth/ui';
 const empty: AdminState = {};
 
 export function InviteForm({ canInviteAdmin }: { canInviteAdmin: boolean }) {
+  const t = useTranslations('admin');
   const [state, action] = useActionState(inviteUserAction, empty);
   return (
     <form action={action} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -24,14 +26,14 @@ export function InviteForm({ canInviteAdmin }: { canInviteAdmin: boolean }) {
       <Alert kind="notice">{state.notice}</Alert>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div style={{ flex: '1 1 220px' }}>
-          <TextField label="Email" name="email" type="email" placeholder="person@example.com" required />
+          <TextField label={t('emailLabel')} name="email" type="email" placeholder="person@example.com" required />
         </div>
-        <select name="role" defaultValue="USER" aria-label="Role" style={selectStyle}>
-          <option value="USER">User</option>
-          <option value="ADMIN">Admin</option>
-          {canInviteAdmin && <option value="SUPERADMIN">Superadmin</option>}
+        <select name="role" defaultValue="USER" aria-label={t('roleLabel')} style={selectStyle}>
+          <option value="USER">{t('roleUser')}</option>
+          <option value="ADMIN">{t('roleAdmin')}</option>
+          {canInviteAdmin && <option value="SUPERADMIN">{t('roleSuperadmin')}</option>}
         </select>
-        <Btn type="submit" icon="plus">Invite</Btn>
+        <Btn type="submit" icon="plus">{t('invite')}</Btn>
       </div>
     </form>
   );
@@ -47,6 +49,7 @@ export interface AdminUserRow {
 }
 
 export function UserActions({ user, canManageSuperadmin }: { user: AdminUserRow; canManageSuperadmin: boolean }) {
+  const t = useTranslations('admin');
   const [roleState, roleAction] = useActionState(setRoleAction, empty);
   const [activeState, activeAction] = useActionState(toggleActiveAction, empty);
   const [resetState, resetAction] = useActionState(resetUserAction, empty);
@@ -61,20 +64,20 @@ export function UserActions({ user, canManageSuperadmin }: { user: AdminUserRow;
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         <form action={roleAction}>
           <input type="hidden" name="targetId" value={user.id} />
-          <select name="role" defaultValue={user.role} onChange={(e) => e.currentTarget.form?.requestSubmit()} aria-label={`Role for ${user.email}`} style={selectStyleSm}>
-            <option value="USER">User</option>
-            <option value="ADMIN">Admin</option>
-            {canManageSuperadmin && <option value="SUPERADMIN">Superadmin</option>}
+          <select name="role" defaultValue={user.role} onChange={(e) => e.currentTarget.form?.requestSubmit()} aria-label={t('roleForUser', { email: user.email })} style={selectStyleSm}>
+            <option value="USER">{t('roleUser')}</option>
+            <option value="ADMIN">{t('roleAdmin')}</option>
+            {canManageSuperadmin && <option value="SUPERADMIN">{t('roleSuperadmin')}</option>}
           </select>
         </form>
         <form action={resetAction}>
           <input type="hidden" name="targetId" value={user.id} />
-          <Btn type="submit" kind="ghost" size="sm">Reset</Btn>
+          <Btn type="submit" kind="ghost" size="sm">{t('reset')}</Btn>
         </form>
         {canImpersonate && (
           <form action={impAction}>
             <input type="hidden" name="targetId" value={user.id} />
-            <Btn type="submit" kind="ghost" size="sm" icon="user">View as</Btn>
+            <Btn type="submit" kind="ghost" size="sm" icon="user">{t('viewAs')}</Btn>
           </form>
         )}
         {!user.self && (
@@ -82,7 +85,7 @@ export function UserActions({ user, canManageSuperadmin }: { user: AdminUserRow;
             <input type="hidden" name="targetId" value={user.id} />
             <input type="hidden" name="activate" value={deactivated ? '1' : '0'} />
             <Btn type="submit" kind={deactivated ? 'soft' : 'ghost'} size="sm">
-              {deactivated ? 'Reactivate' : 'Deactivate'}
+              {deactivated ? t('reactivate') : t('deactivate')}
             </Btn>
           </form>
         )}

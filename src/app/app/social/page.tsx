@@ -1,26 +1,28 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { getStatsBundle } from '@/server/queries/gamification';
 import { Card, Chip, Icon, SectionLabel } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 
-const LINKS = [
-  { href: '/app/social/league', icon: 'trophy' as const, title: 'League', desc: 'Your weekly division and standings' },
-  { href: '/app/social/leaderboard', icon: 'chart' as const, title: 'Leaderboards', desc: 'Instance-wide XP, streak and volume' },
-  { href: '/app/profile/friends', icon: 'users' as const, title: 'Friends', desc: 'Add friends and compare progress' },
-  { href: '/app/social/compare', icon: 'target' as const, title: 'Compare', desc: 'Stack your stats next to a friend' },
-  { href: '/app/social/feed', icon: 'flame' as const, title: 'Friend activity', desc: 'PRs, streaks and milestones' },
-];
-
 export default async function SocialPage() {
   const user = await requireUser();
   const { tier, weeklyXp } = await getStatsBundle(user.id);
+  const t = await getTranslations('social');
+
+  const LINKS = [
+    { href: '/app/social/league', icon: 'trophy' as const, title: t('hubLeagueTitle'), desc: t('hubLeagueDesc') },
+    { href: '/app/social/leaderboard', icon: 'chart' as const, title: t('hubLeaderboardsTitle'), desc: t('hubLeaderboardsDesc') },
+    { href: '/app/profile/friends', icon: 'users' as const, title: t('hubFriendsTitle'), desc: t('hubFriendsDesc') },
+    { href: '/app/social/compare', icon: 'target' as const, title: t('hubCompareTitle'), desc: t('hubCompareDesc') },
+    { href: '/app/social/feed', icon: 'flame' as const, title: t('hubFeedTitle'), desc: t('hubFeedDesc') },
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>Social</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{t('title')}</h1>
         <Chip accent>{tier.toLowerCase()} · {weeklyXp} XP</Chip>
       </div>
       {LINKS.map((l) => (
@@ -37,7 +39,7 @@ export default async function SocialPage() {
           </Card>
         </Link>
       ))}
-      <SectionLabel style={{ textAlign: 'center', color: 'var(--text-3)' }}>Train daily to climb your league.</SectionLabel>
+      <SectionLabel style={{ textAlign: 'center', color: 'var(--text-3)' }}>{t('hubFooter')}</SectionLabel>
     </div>
   );
 }

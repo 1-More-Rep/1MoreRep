@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import type { InstanceSettings } from '@prisma/client';
 import {
   updateGeneralSettingsAction,
@@ -31,64 +32,67 @@ function Toggle({ name, label, defaultChecked }: { name: string; label: string; 
 }
 
 export function GeneralForm({ s }: { s: InstanceSettings }) {
+  const t = useTranslations('admin');
   const [state, action] = useActionState(updateGeneralSettingsAction, empty);
   return (
     <Card>
-      <SectionLabel style={{ marginBottom: 14 }}>General &amp; registration</SectionLabel>
+      <SectionLabel style={{ marginBottom: 14 }}>{t('generalAndRegistration')}</SectionLabel>
       <form action={action} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Alert kind="error">{state.error}</Alert>
         <Alert kind="notice">{state.notice}</Alert>
         <div style={fieldRow}>
-          <TextField label="Instance name" name="brandName" defaultValue={s.brandName} />
+          <TextField label={t('instanceName')} name="brandName" defaultValue={s.brandName} />
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Default units</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{t('defaultUnits')}</span>
             <select name="defaultUnitSystem" defaultValue={s.defaultUnitSystem} style={selectStyle}>
-              <option value="METRIC">Metric (kg)</option>
-              <option value="IMPERIAL">Imperial (lb)</option>
+              <option value="METRIC">{t('unitMetric')}</option>
+              <option value="IMPERIAL">{t('unitImperial')}</option>
             </select>
           </label>
         </div>
-        <Toggle name="allowSelfRegistration" label="Allow people to register themselves" defaultChecked={s.allowSelfRegistration} />
-        <Toggle name="requireEmailVerification" label="Require email verification for new accounts" defaultChecked={s.requireEmailVerification} />
-        <Btn type="submit" icon="check" style={{ alignSelf: 'flex-start' }}>Save settings</Btn>
+        <Toggle name="allowSelfRegistration" label={t('allowSelfRegistration')} defaultChecked={s.allowSelfRegistration} />
+        <Toggle name="requireEmailVerification" label={t('requireEmailVerification')} defaultChecked={s.requireEmailVerification} />
+        <Btn type="submit" icon="check" style={{ alignSelf: 'flex-start' }}>{t('saveSettings')}</Btn>
       </form>
     </Card>
   );
 }
 
 export function SmtpForm({ s }: { s: InstanceSettings }) {
+  const t = useTranslations('admin');
   const [state, action] = useActionState(updateSmtpAction, empty);
   const [test, testAction] = useActionState(async () => testSmtpAction(), empty);
   return (
     <Card>
-      <SectionLabel style={{ marginBottom: 14 }}>Email (SMTP)</SectionLabel>
+      <SectionLabel style={{ marginBottom: 14 }}>{t('emailSmtp')}</SectionLabel>
       <form action={action} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Alert kind="error">{state.error}</Alert>
         <Alert kind="notice">{state.notice}</Alert>
         <div style={fieldRow}>
-          <TextField label="Host" name="smtpHost" defaultValue={s.smtpHost ?? ''} placeholder="smtp.example.com" />
-          <TextField label="Port" name="smtpPort" type="number" defaultValue={s.smtpPort ?? 587} />
-          <TextField label="Username" name="smtpUser" defaultValue={s.smtpUser ?? ''} />
-          <TextField label="Password" name="smtpPassword" type="password" placeholder={s.smtpPasswordEnc ? '•••••• (unchanged)' : ''} />
-          <TextField label="From address" name="smtpFrom" defaultValue={s.smtpFrom ?? ''} placeholder="no-reply@example.com" />
+          <TextField label={t('smtpHost')} name="smtpHost" defaultValue={s.smtpHost ?? ''} placeholder="smtp.example.com" />
+          <TextField label={t('smtpPort')} name="smtpPort" type="number" defaultValue={s.smtpPort ?? 587} />
+          <TextField label={t('smtpUsername')} name="smtpUser" defaultValue={s.smtpUser ?? ''} />
+          <TextField label={t('smtpPassword')} name="smtpPassword" type="password" placeholder={s.smtpPasswordEnc ? t('passwordUnchanged') : ''} />
+          <TextField label={t('smtpFrom')} name="smtpFrom" defaultValue={s.smtpFrom ?? ''} placeholder="no-reply@example.com" />
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
-          <input type="checkbox" name="smtpSecure" defaultChecked={s.smtpSecure} /> Use TLS (port 465)
+          <input type="checkbox" name="smtpSecure" defaultChecked={s.smtpSecure} /> {t('useTls')}
         </label>
         <div style={{ display: 'flex', gap: 10 }}>
-          <Btn type="submit" icon="check">Save SMTP</Btn>
+          <Btn type="submit" icon="check">{t('saveSmtp')}</Btn>
         </div>
       </form>
       <form action={testAction} style={{ marginTop: 10 }}>
         <Alert kind="error">{test.error}</Alert>
         <Alert kind="notice">{test.notice}</Alert>
-        <Btn type="submit" kind="ghost" size="sm">Send test / verify connection</Btn>
+        <Btn type="submit" kind="ghost" size="sm">{t('sendTestVerify')}</Btn>
       </form>
     </Card>
   );
 }
 
 export function LlmForm({ s }: { s: InstanceSettings }) {
+  const t = useTranslations('admin');
   const [state, action] = useActionState(updateLlmAction, empty);
   const [test, testAction] = useActionState(async () => testLlmAction(), empty);
   const [provider, setProvider] = useState(s.llmProvider);
@@ -126,20 +130,20 @@ export function LlmForm({ s }: { s: InstanceSettings }) {
   const modelOptions =
     models && models.length > 0
       ? [
-          ...(model && !models.includes(model) ? [{ value: model, label: `${model} (not installed)` }] : []),
+          ...(model && !models.includes(model) ? [{ value: model, label: t('modelNotInstalled', { model }) }] : []),
           ...models.map((m) => ({ value: m, label: m })),
         ]
       : [];
 
   return (
     <Card>
-      <SectionLabel style={{ marginBottom: 14 }}>Workout generator LLM</SectionLabel>
+      <SectionLabel style={{ marginBottom: 14 }}>{t('workoutGeneratorLlm')}</SectionLabel>
       <form action={action} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Alert kind="error">{state.error}</Alert>
         <Alert kind="notice">{state.notice}</Alert>
         <div style={fieldRow}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Provider</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{t('provider')}</span>
             <select
               name="llmProvider"
               value={provider}
@@ -149,14 +153,14 @@ export function LlmForm({ s }: { s: InstanceSettings }) {
               }}
               style={selectStyle}
             >
-              <option value="NONE">None (deterministic only)</option>
-              <option value="OLLAMA">Ollama (local)</option>
-              <option value="ANTHROPIC" disabled>Anthropic (coming soon)</option>
-              <option value="OPENAI" disabled>OpenAI (coming soon)</option>
+              <option value="NONE">{t('providerNone')}</option>
+              <option value="OLLAMA">{t('providerOllama')}</option>
+              <option value="ANTHROPIC" disabled>{t('providerAnthropic')}</option>
+              <option value="OPENAI" disabled>{t('providerOpenai')}</option>
             </select>
           </label>
           <TextField
-            label="Base URL"
+            label={t('baseUrl')}
             name="llmBaseUrl"
             value={baseUrl}
             onChange={(e) => {
@@ -167,17 +171,17 @@ export function LlmForm({ s }: { s: InstanceSettings }) {
           />
           {models && models.length > 0 ? (
             <Select
-              label="Model"
+              label={t('model')}
               name="llmModel"
-              ariaLabel="Model"
+              ariaLabel={t('model')}
               value={model}
               onChange={setModel}
               options={modelOptions}
-              placeholder="Select a model…"
+              placeholder={t('selectAModel')}
             />
           ) : (
             <TextField
-              label="Model"
+              label={t('model')}
               name="llmModel"
               value={model}
               onChange={(e) => setModel(e.target.value)}
@@ -185,17 +189,17 @@ export function LlmForm({ s }: { s: InstanceSettings }) {
             />
           )}
           {provider !== 'NONE' && provider !== 'OLLAMA' && (
-            <TextField label="API key" name="llmApiKey" type="password" placeholder={s.llmApiKeyEnc ? '•••••• (unchanged)' : ''} />
+            <TextField label={t('apiKey')} name="llmApiKey" type="password" placeholder={s.llmApiKeyEnc ? t('passwordUnchanged') : ''} />
           )}
         </div>
 
         {isOllama && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <Btn type="button" kind="soft" size="sm" icon="repeat" onClick={checkConnection} disabled={probing || !baseUrl}>
-              {probing ? 'Checking…' : 'Check connection'}
+              {probing ? t('checking') : t('checkConnection')}
             </Btn>
             <span style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
-              Detects installed models so you can pick one instead of typing it.
+              {t('detectsInstalledModels')}
             </span>
           </div>
         )}
@@ -204,31 +208,32 @@ export function LlmForm({ s }: { s: InstanceSettings }) {
 
         {unsupported && (
           <Alert kind="error">
-            This provider isn&apos;t implemented yet — saving will be rejected. Use Ollama or None for now.
+            {t('providerNotImplemented')}
           </Alert>
         )}
-        <Btn type="submit" icon="check" style={{ alignSelf: 'flex-start' }} disabled={unsupported}>Save LLM</Btn>
+        <Btn type="submit" icon="check" style={{ alignSelf: 'flex-start' }} disabled={unsupported}>{t('saveLlm')}</Btn>
       </form>
       <form action={testAction} style={{ marginTop: 10 }}>
         <Alert kind="error">{test.error}</Alert>
         <Alert kind="notice">{test.notice}</Alert>
-        <Btn type="submit" kind="ghost" size="sm">Test prompt (saved settings)</Btn>
+        <Btn type="submit" kind="ghost" size="sm">{t('testPrompt')}</Btn>
       </form>
     </Card>
   );
 }
 
 export function BrandingForm({ s }: { s: InstanceSettings }) {
+  const t = useTranslations('admin');
   const [state, action] = useActionState(updateBrandingAction, empty);
   return (
     <Card>
-      <SectionLabel style={{ marginBottom: 14 }}>Branding</SectionLabel>
+      <SectionLabel style={{ marginBottom: 14 }}>{t('branding')}</SectionLabel>
       <form action={action} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Alert kind="error">{state.error}</Alert>
         <Alert kind="notice">{state.notice}</Alert>
         <div style={fieldRow}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Theme color</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>{t('themeColor')}</span>
             <input
               type="color"
               name="themeColor"
@@ -238,7 +243,7 @@ export function BrandingForm({ s }: { s: InstanceSettings }) {
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>
-              Logo {s.brandLogoKey ? '(replace)' : ''}
+              {s.brandLogoKey ? t('logoReplace') : t('logo')}
             </span>
             <input
               type="file"
@@ -248,7 +253,7 @@ export function BrandingForm({ s }: { s: InstanceSettings }) {
             />
           </label>
         </div>
-        <Btn type="submit" icon="check" style={{ alignSelf: 'flex-start' }}>Save branding</Btn>
+        <Btn type="submit" icon="check" style={{ alignSelf: 'flex-start' }}>{t('saveBranding')}</Btn>
       </form>
     </Card>
   );

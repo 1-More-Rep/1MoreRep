@@ -2,11 +2,13 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { MUSCLES, MUSCLE_LABEL } from '@/domain/muscles/taxonomy';
 
 const EQUIPMENT = ['BARBELL', 'DUMBBELL', 'MACHINE', 'CABLE', 'BODYWEIGHT', 'KETTLEBELL', 'BAND', 'EZ_BAR', 'BALL', 'OTHER'];
 
 export function ExerciseFilters() {
+  const t = useTranslations('exercises');
   const router = useRouter();
   const sp = useSearchParams();
   const [pending, start] = useTransition();
@@ -22,20 +24,20 @@ export function ExerciseFilters() {
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', opacity: pending ? 0.6 : 1 }}>
       <input
         type="search"
-        placeholder="Search exercises…"
+        placeholder={t('searchPlaceholder')}
         defaultValue={sp.get('q') ?? ''}
-        aria-label="Search exercises"
+        aria-label={t('searchAria')}
         onChange={(e) => setParam('q', e.target.value)}
         style={{ ...input, flex: '1 1 220px' }}
       />
-      <select aria-label="Muscle" value={sp.get('muscle') ?? ''} onChange={(e) => setParam('muscle', e.target.value)} style={input}>
-        <option value="">All muscles</option>
+      <select aria-label={t('muscleAria')} value={sp.get('muscle') ?? ''} onChange={(e) => setParam('muscle', e.target.value)} style={input}>
+        <option value="">{t('allMuscles')}</option>
         {MUSCLES.map((m) => (
           <option key={m} value={m}>{MUSCLE_LABEL[m]}</option>
         ))}
       </select>
-      <select aria-label="Equipment" value={sp.get('equipment') ?? ''} onChange={(e) => setParam('equipment', e.target.value)} style={input}>
-        <option value="">All equipment</option>
+      <select aria-label={t('equipmentAria')} value={sp.get('equipment') ?? ''} onChange={(e) => setParam('equipment', e.target.value)} style={input}>
+        <option value="">{t('allEquipment')}</option>
         {EQUIPMENT.map((e) => (
           <option key={e} value={e}>{e.charAt(0) + e.slice(1).toLowerCase().replace('_', ' ')}</option>
         ))}

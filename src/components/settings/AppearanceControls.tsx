@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { saveAppearanceAction } from '@/server/actions/appearance';
 import { ACCENTS, ACCENT_NAMES, DENSITY, FONTS, type Density, type FontPairing, type ThemeMode } from '@/lib/theme/tokens';
@@ -18,6 +19,8 @@ const selectStyle: React.CSSProperties = {
 };
 
 export function AppearanceControls() {
+  const t = useTranslations('appearance');
+  const tp = useTranslations('settingsPages');
   const { tweaks, setTweak, reset } = useTheme();
   const firstRun = useRef(true);
 
@@ -36,21 +39,21 @@ export function AppearanceControls() {
   return (
     <Card style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div>
-        <SectionLabel style={{ marginBottom: 10 }}>Theme</SectionLabel>
+        <SectionLabel style={{ marginBottom: 10 }}>{t('theme')}</SectionLabel>
         <Segmented<ThemeMode>
-          ariaLabel="Color theme"
+          ariaLabel={tp('colorThemeAria')}
           value={tweaks.mode}
           onChange={(m) => setTweak('mode', m)}
           options={[
-            { value: 'system', label: 'System', icon: 'monitor' },
-            { value: 'light', label: 'Light', icon: 'sun' },
-            { value: 'dark', label: 'Dark', icon: 'moon' },
+            { value: 'system', label: t('system'), icon: 'monitor' },
+            { value: 'light', label: t('light'), icon: 'sun' },
+            { value: 'dark', label: t('dark'), icon: 'moon' },
           ]}
         />
       </div>
 
       <div>
-        <SectionLabel style={{ marginBottom: 10 }}>Accent</SectionLabel>
+        <SectionLabel style={{ marginBottom: 10 }}>{t('accent')}</SectionLabel>
         <div style={{ display: 'flex', gap: 8 }}>
           {ACCENTS.map((a) => (
             <button
@@ -66,16 +69,16 @@ export function AppearanceControls() {
 
       <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <SectionLabel>Font</SectionLabel>
-          <select aria-label="Font pairing" value={tweaks.font} onChange={(e) => setTweak('font', e.target.value as FontPairing)} style={selectStyle}>
+          <SectionLabel>{t('font')}</SectionLabel>
+          <select aria-label={tp('fontPairingAria')} value={tweaks.font} onChange={(e) => setTweak('font', e.target.value as FontPairing)} style={selectStyle}>
             {(Object.keys(FONTS) as FontPairing[]).map((f) => (
               <option key={f} value={f}>{FONTS[f].label}</option>
             ))}
           </select>
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <SectionLabel>Density</SectionLabel>
-          <select aria-label="Density" value={tweaks.density} onChange={(e) => setTweak('density', e.target.value as Density)} style={selectStyle}>
+          <SectionLabel>{t('density')}</SectionLabel>
+          <select aria-label={t('density')} value={tweaks.density} onChange={(e) => setTweak('density', e.target.value as Density)} style={selectStyle}>
             {(Object.keys(DENSITY) as Density[]).map((dn) => (
               <option key={dn} value={dn}>{dn}</option>
             ))}
@@ -84,12 +87,12 @@ export function AppearanceControls() {
       </div>
 
       <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-2)' }}>
-        <SectionLabel>Corner radius</SectionLabel>
-        <input type="range" min={4} max={24} value={tweaks.radius} onChange={(e) => setTweak('radius', Number(e.target.value))} aria-label="Corner radius" />
+        <SectionLabel>{t('cornerRadius')}</SectionLabel>
+        <input type="range" min={4} max={24} value={tweaks.radius} onChange={(e) => setTweak('radius', Number(e.target.value))} aria-label={t('cornerRadius')} />
         <Mono>{tweaks.radius}px</Mono>
       </label>
 
-      <Btn kind="ghost" size="sm" icon="repeat" onClick={reset} style={{ alignSelf: 'flex-start' }}>Reset to defaults</Btn>
+      <Btn kind="ghost" size="sm" icon="repeat" onClick={reset} style={{ alignSelf: 'flex-start' }}>{t('reset')}</Btn>
     </Card>
   );
 }

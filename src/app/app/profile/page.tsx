@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { requireUser, hasRole } from '@/lib/auth/guards';
 import { getStatsBundle } from '@/server/queries/gamification';
 import { openFeedbackCount } from '@/server/queries/feedback';
@@ -10,12 +11,12 @@ export const dynamic = 'force-dynamic';
 
 const initials = (name: string) => name.split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 
-const ADMIN_LINKS: { href: string; label: string; icon: IconName }[] = [
-  { href: '/admin', label: 'Dashboard', icon: 'chart' },
-  { href: '/admin/users', label: 'Users', icon: 'user' },
-  { href: '/admin/feedback', label: 'Feedback', icon: 'megaphone' },
-  { href: '/admin/settings', label: 'Settings', icon: 'settings' },
-  { href: '/admin/audit', label: 'Audit log', icon: 'history' },
+const ADMIN_LINKS: { href: string; labelKey: string; icon: IconName }[] = [
+  { href: '/admin', labelKey: 'adminDashboard', icon: 'chart' },
+  { href: '/admin/users', labelKey: 'adminUsers', icon: 'user' },
+  { href: '/admin/feedback', labelKey: 'adminFeedback', icon: 'megaphone' },
+  { href: '/admin/settings', labelKey: 'adminSettings', icon: 'settings' },
+  { href: '/admin/audit', labelKey: 'adminAuditLog', icon: 'history' },
 ];
 
 /** A tappable row in the Profile hub menu. */
@@ -70,6 +71,7 @@ function HubRow({
 }
 
 export default async function ProfilePage() {
+  const t = await getTranslations('profile');
   const user = await requireUser();
   const { stats, progress, tier } = await getStatsBundle(user.id);
   const isAdmin = hasRole(user, 'ADMIN');
@@ -88,53 +90,53 @@ export default async function ProfilePage() {
           <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{user.displayName}</h1>
           {user.publicHandle && <div style={{ fontSize: 13, color: 'var(--text-3)' }}>@{user.publicHandle}</div>}
         </div>
-        <Link href="/app/settings" style={{ textDecoration: 'none' }}><Btn kind="ghost" size="sm" icon="settings">Settings</Btn></Link>
+        <Link href="/app/settings" style={{ textDecoration: 'none' }}><Btn kind="ghost" size="sm" icon="settings">{t('settings')}</Btn></Link>
       </div>
 
       <Card style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
         <Ring pct={progress.pct} size={104}>
           <Mono style={{ fontSize: 26, fontWeight: 700 }}>{progress.level}</Mono>
-          <span style={{ fontSize: 10, color: 'var(--text-3)' }}>level</span>
+          <span style={{ fontSize: 10, color: 'var(--text-3)' }}>{t('level')}</span>
         </Ring>
         <div style={{ flex: 1 }}>
-          <SectionLabel>Progress</SectionLabel>
+          <SectionLabel>{t('progress')}</SectionLabel>
           <div style={{ fontSize: 14, color: 'var(--text-2)', marginTop: 6 }}>
-            <Mono>{progress.intoLevel}</Mono> / <Mono>{progress.forNext}</Mono> XP to level {progress.level + 1}
+            <Mono>{progress.intoLevel}</Mono> / <Mono>{progress.forNext}</Mono> {t('xpToLevel', { level: progress.level + 1 })}
           </div>
-          <div style={{ marginTop: 8 }}><Chip accent>{tier.toLowerCase()} league</Chip></div>
+          <div style={{ marginTop: 8 }}><Chip accent>{t('leagueChip', { tier: tier.toLowerCase() })}</Chip></div>
         </div>
       </Card>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--gap)' }}>
         <Card>
-          <SectionLabel>Streak</SectionLabel>
+          <SectionLabel>{t('streak')}</SectionLabel>
           <Mono style={{ fontSize: 26, fontWeight: 700, display: 'block', marginTop: 6 }}>{stats.currentStreak}</Mono>
-          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>current · longest {stats.longestStreak} · {stats.freezesAvail} freeze{stats.freezesAvail === 1 ? '' : 's'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('streakMeta', { longest: stats.longestStreak, freezes: stats.freezesAvail })}</div>
         </Card>
         <Card>
-          <SectionLabel>Lifetime</SectionLabel>
+          <SectionLabel>{t('lifetime')}</SectionLabel>
           <Mono style={{ fontSize: 26, fontWeight: 700, display: 'block', marginTop: 6 }}>{stats.lifetimeXp.toLocaleString()}</Mono>
-          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>XP · {stats.totalSessions} sessions</div>
+          <div style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('lifetimeMeta', { sessions: stats.totalSessions })}</div>
         </Card>
       </div>
 
       <Card>
-        <SectionLabel>Total volume</SectionLabel>
-        <Mono style={{ fontSize: 22, fontWeight: 700, display: 'block', marginTop: 6 }}>{Math.round(Number(stats.totalVolume) / 100).toLocaleString()} kg·reps</Mono>
+        <SectionLabel>{t('totalVolume')}</SectionLabel>
+        <Mono style={{ fontSize: 22, fontWeight: 700, display: 'block', marginTop: 6 }}>{t('volumeValue', { value: Math.round(Number(stats.totalVolume) / 100).toLocaleString() })}</Mono>
       </Card>
 
       <Card pad={false}>
-        <HubRow first href="/app/profile/friends" icon="users" label="Friends" badge={pendingFriends || undefined} />
-        <HubRow href="/app/social" icon="trophy" label="League & leaderboards" />
-        <HubRow href="/app/muscle" icon="heart" label="Muscle map" />
-        <HubRow href="/app/feedback" icon="megaphone" label="Help & feedback" />
-        <HubRow href="/app/settings" icon="settings" label="Settings" />
+        <HubRow first href="/app/profile/friends" icon="users" label={t('friends')} badge={pendingFriends || undefined} />
+        <HubRow href="/app/social" icon="trophy" label={t('leagueLeaderboards')} />
+        <HubRow href="/app/muscle" icon="heart" label={t('muscleMap')} />
+        <HubRow href="/app/feedback" icon="megaphone" label={t('helpFeedback')} />
+        <HubRow href="/app/settings" icon="settings" label={t('settings')} />
       </Card>
 
       {isAdmin && (
         <Card pad={false}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 'var(--pad) var(--pad) 4px' }}>
-            <SectionLabel>Admin</SectionLabel>
+            <SectionLabel>{t('admin')}</SectionLabel>
             <Chip accent style={{ marginLeft: 'auto' }}>{user.role.toLowerCase()}</Chip>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -147,8 +149,8 @@ export default async function ProfilePage() {
                 <span style={{ width: 30, height: 30, borderRadius: 'var(--r-sm)', background: 'var(--surface-2)', color: 'var(--accent-text)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name={l.icon} size={16} stroke={1.8} />
                 </span>
-                <span style={{ flex: 1, fontSize: 14.5, fontWeight: 500 }}>{l.label}</span>
-                {l.href === '/admin/feedback' && openFeedback > 0 && <Chip accent>{openFeedback} to triage</Chip>}
+                <span style={{ flex: 1, fontSize: 14.5, fontWeight: 500 }}>{t(l.labelKey)}</span>
+                {l.href === '/admin/feedback' && openFeedback > 0 && <Chip accent>{t('toTriage', { count: openFeedback })}</Chip>}
                 <Icon name="chevronR" size={16} stroke={1.8} />
               </Link>
             ))}

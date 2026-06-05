@@ -1,3 +1,4 @@
+import { getTranslations } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { prisma } from '@/server/db/prisma';
 import { computeAndCacheFatigue } from '@/server/services/fatigueService';
@@ -10,6 +11,7 @@ import { MuscleOverview, type MuscleInfo } from '@/components/body-map/MuscleOve
 export const dynamic = 'force-dynamic';
 
 export default async function MusclePage() {
+  const t = await getTranslations('muscles');
   const user = await requireUser();
   const fatigue = await computeAndCacheFatigue(user.id);
   const weeklyVolume = await weeklyVolumeByMuscle(user.id, new Date());
@@ -47,9 +49,9 @@ export default async function MusclePage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
       <div>
-        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>Muscles</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{t('title')}</h1>
         <p style={{ fontSize: 14, color: 'var(--text-2)', margin: '6px 0 0' }}>
-          Recovery shows fatigue from recent training; Strength shows your level per muscle from your lifts.
+          {t('intro')}
         </p>
       </div>
       <MuscleOverview data={data} strength={strength} bodyweightKg={bodyweightKg} topExercises={topExercises} />

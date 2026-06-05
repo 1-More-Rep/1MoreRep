@@ -1,18 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { updateRoutineAction } from '@/server/actions/routines';
 import { Select, Textarea, useToast } from '@/components/ui';
 
 type GoalValue = '' | 'HYPERTROPHY' | 'STRENGTH' | 'ENDURANCE' | 'GENERAL';
-
-const GOAL_OPTIONS: { value: GoalValue; label: string }[] = [
-  { value: '', label: 'No specific goal' },
-  { value: 'HYPERTROPHY', label: 'Hypertrophy' },
-  { value: 'STRENGTH', label: 'Strength' },
-  { value: 'ENDURANCE', label: 'Endurance' },
-  { value: 'GENERAL', label: 'General fitness' },
-];
 
 export function RoutineHeaderEditor({
   routineId,
@@ -25,11 +18,20 @@ export function RoutineHeaderEditor({
   goal: GoalValue;
   notes: string;
 }) {
+  const t = useTranslations('routine');
   const { toast } = useToast();
   const [, start] = useTransition();
   const [name, setName] = useState(initialName);
   const [goal, setGoal] = useState<GoalValue>(initialGoal);
   const [notes, setNotes] = useState(initialNotes);
+
+  const GOAL_OPTIONS: { value: GoalValue; label: string }[] = [
+    { value: '', label: t('goalNone') },
+    { value: 'HYPERTROPHY', label: t('goalHypertrophy') },
+    { value: 'STRENGTH', label: t('goalStrength') },
+    { value: 'ENDURANCE', label: t('goalEndurance') },
+    { value: 'GENERAL', label: t('goalGeneral') },
+  ];
 
   function commit(patch: { name?: string; goal?: GoalValue; notes?: string }, successMsg?: string) {
     start(async () => {
@@ -43,16 +45,16 @@ export function RoutineHeaderEditor({
     const trimmed = name.trim();
     if (trimmed.length < 2) {
       setName(initialName); // revert invalid
-      toast('Name must be at least 2 characters.', 'error');
+      toast(t('nameTooShort'), 'error');
       return;
     }
-    if (trimmed !== initialName) commit({ name: trimmed }, 'Routine renamed.');
+    if (trimmed !== initialName) commit({ name: trimmed }, t('renamed'));
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <input
-        aria-label="Routine name"
+        aria-label={t('routineName')}
         value={name}
         onChange={(e) => setName(e.target.value)}
         onBlur={commitName}
@@ -84,27 +86,27 @@ export function RoutineHeaderEditor({
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div style={{ flex: '1 1 200px' }}>
           <Select<GoalValue>
-            label="Goal"
+            label={t('goal')}
             ariaLabel="Routine goal"
             value={goal}
             onChange={(g) => {
               setGoal(g);
-              commit({ goal: g }, 'Goal updated.');
+              commit({ goal: g }, t('goalUpdated'));
             }}
             options={GOAL_OPTIONS}
           />
         </div>
       </div>
       <Textarea
-        label="Notes"
+        label={t('notes')}
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         onBlur={() => {
-          if (notes.trim() !== initialNotes) commit({ notes: notes.trim() }, 'Notes saved.');
+          if (notes.trim() !== initialNotes) commit({ notes: notes.trim() }, t('notesSaved'));
         }}
         rows={2}
         maxLength={2000}
-        placeholder="Optional notes — focus, tempo, reminders…"
+        placeholder={t('notesPlaceholder')}
       />
     </div>
   );

@@ -1,13 +1,14 @@
 'use client';
 
 import { useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { revokeSessionAction, logoutOtherSessionsAction } from '@/server/actions/session';
 import { Card, Btn, Chip, Icon } from '@/components/ui';
 import type { UserSessionRow } from '@/server/queries/sessions';
 
 /** Parse a short, human-friendly label from a User-Agent string. */
-function describeDevice(ua: string | null): string {
-  if (!ua) return 'Unknown device';
+function describeDevice(ua: string | null, unknownLabel: string, onLabel: (browser: string, os: string) => string): string {
+  if (!ua) return unknownLabel;
   let browser = '';
   if (/Edg\//.test(ua)) browser = 'Edge';
   else if (/OPR\/|Opera/.test(ua)) browser = 'Opera';
@@ -22,10 +23,10 @@ function describeDevice(ua: string | null): string {
   else if (/Windows/.test(ua)) os = 'Windows';
   else if (/Linux/.test(ua)) os = 'Linux';
 
-  if (browser && os) return `${browser} on ${os}`;
+  if (browser && os) return onLabel(browser, os);
   if (browser) return browser;
   if (os) return os;
-  return 'Unknown device';
+  return unknownLabel;
 }
 
 function fmtDate(d: Date): string {
@@ -33,6 +34,7 @@ function fmtDate(d: Date): string {
 }
 
 export function SessionsManager({ sessions }: { sessions: UserSessionRow[] }) {
+  const t = useTranslations('settingsPages');
   const [pending, startTransition] = useTransition();
   const otherCount = sessions.filter((s) => !s.isCurrent).length;
 
@@ -44,11 +46,11 @@ export function SessionsManager({ sessions }: { sessions: UserSessionRow[] }) {
             <Icon name="settings" size={19} />
           </span>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>{s.label || describeDevice(s.userAgent)}</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>Last used {fmtDate(s.lastUsedAt)}</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{s.label || describeDevice(s.userAgent, t('unknownDevice'), (browser, os) => t('deviceOn', { browser, os }))}</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{t('lastUsed', { date: fmtDate(s.lastUsedAt) })}</div>
           </div>
           {s.isCurrent ? (
-            <Chip accent>This device</Chip>
+            <Chip accent>{t('thisDevice')}</Chip>
           ) : (
             <Btn
               kind="ghost"
@@ -56,7 +58,7 @@ export function SessionsManager({ sessions }: { sessions: UserSessionRow[] }) {
               disabled={pending}
               onClick={() => startTransition(() => revokeSessionAction(s.id))}
             >
-              Revoke
+              {t('revoke')}
             </Btn>
           )}
         </Card>
@@ -70,7 +72,7 @@ export function SessionsManager({ sessions }: { sessions: UserSessionRow[] }) {
           disabled={pending}
           onClick={() => startTransition(() => logoutOtherSessionsAction())}
         >
-          Log out everywhere else
+          {t('logoutEverywhere')}
         </Btn>
       )}
     </div>

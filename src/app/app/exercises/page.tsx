@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { getTranslations } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { searchExercises } from '@/server/queries/exercises';
 import { MUSCLE_LABEL } from '@/domain/muscles/taxonomy';
@@ -18,6 +19,7 @@ export default async function ExercisesPage({
 }: {
   searchParams: Promise<{ q?: string; muscle?: string; equipment?: string }>;
 }) {
+  const t = await getTranslations('exercises');
   const user = await requireUser();
   const sp = await searchParams;
   const results = await searchExercises({
@@ -31,18 +33,18 @@ export default async function ExercisesPage({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>Exercises</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{t('title')}</h1>
         <Link href="/app/exercises/new" style={{ textDecoration: 'none' }}>
-          <Btn icon="plus" size="sm">New exercise</Btn>
+          <Btn icon="plus" size="sm">{t('newExercise')}</Btn>
         </Link>
       </div>
 
       <ExerciseFilters />
 
-      <SectionLabel>{results.length} result{results.length === 1 ? '' : 's'}</SectionLabel>
+      <SectionLabel>{t('resultCount', { count: results.length })}</SectionLabel>
 
       <Card pad={false}>
-        {results.length === 0 && <div style={{ padding: 'var(--pad)', color: 'var(--text-3)' }}>No matching exercises.</div>}
+        {results.length === 0 && <div style={{ padding: 'var(--pad)', color: 'var(--text-3)' }}>{t('noMatching')}</div>}
         {results.map((ex, i) => {
           const primaries = ex.muscleLinks.filter((m) => m.role === 'PRIMARY').map((m) => MUSCLE_LABEL[m.muscle]);
           return (
@@ -65,7 +67,7 @@ export default async function ExercisesPage({
                 <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{primaries.join(' · ') || '—'}</div>
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                {ex.isCustom && <Chip accent>custom</Chip>}
+                {ex.isCustom && <Chip accent>{t('custom')}</Chip>}
                 <Chip>{ex.equipment.toLowerCase().replace('_', ' ')}</Chip>
               </div>
             </Link>

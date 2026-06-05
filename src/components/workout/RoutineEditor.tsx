@@ -1,6 +1,7 @@
 'use client';
 
 import { useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { addRoutineItemAction, removeRoutineItemAction, updateRoutineItemAction, reorderRoutineItemsAction } from '@/server/actions/routines';
 import { ExercisePicker } from '@/components/exercises/ExercisePicker';
 import { Card } from '@/components/ui/Card';
@@ -54,12 +55,13 @@ const iconBtn: React.CSSProperties = {
 export function RoutineEditor({ routineId, items }: { routineId: string; items: EditorItem[] }) {
   const [, start] = useTransition();
   const { toast } = useToast();
+  const t = useTranslations('routine');
   const run = (fn: () => Promise<unknown>) =>
     start(async () => {
       try {
         await fn();
       } catch {
-        toast("Couldn't save that change — check your connection and try again.", 'error');
+        toast(t('saveFailed'), 'error');
       }
     });
   const update = (id: string, data: Record<string, number | null>) => run(() => updateRoutineItemAction(id, data));

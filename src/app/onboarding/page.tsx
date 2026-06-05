@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { Icon } from '@/components/ui/Icon';
 import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow';
@@ -7,6 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function OnboardingPage() {
   const user = await requireUser();
+  const t = await getTranslations('onboarding');
   // Completed users are never re-onboarded.
   if (user.onboardedAt) redirect('/app');
   return (
@@ -17,8 +19,8 @@ export default async function OnboardingPage() {
             <Icon name="bolt" size={23} stroke={2.1} />
           </span>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', margin: 0 }}>Welcome, {user.displayName}</h1>
-            <div style={{ fontSize: 13, color: 'var(--text-3)' }}>Let&apos;s set you up.</div>
+            <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', margin: 0 }}>{t('welcome', { name: user.displayName })}</h1>
+            <div style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('welcomeSub')}</div>
           </div>
         </div>
         <OnboardingFlow />

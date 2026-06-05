@@ -2,11 +2,13 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { setRoutineArchivedAction } from '@/server/actions/routines';
 import { Btn, Sheet, useToast } from '@/components/ui';
 
 /** Archive a routine behind a confirm step (soft-delete; recoverable from Archived). */
 export function ArchiveRoutineButton({ routineId, name }: { routineId: string; name: string }) {
+  const t = useTranslations('routine');
   const router = useRouter();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -15,7 +17,7 @@ export function ArchiveRoutineButton({ routineId, name }: { routineId: string; n
   function archive() {
     start(async () => {
       await setRoutineArchivedAction(routineId, true);
-      toast(`Archived “${name}”.`, 'info');
+      toast(t('archived', { name }), 'info');
       setOpen(false);
       router.push('/app/workouts');
     });
@@ -24,16 +26,15 @@ export function ArchiveRoutineButton({ routineId, name }: { routineId: string; n
   return (
     <>
       <Btn type="button" kind="ghost" size="sm" icon="trash" onClick={() => setOpen(true)} style={{ color: 'var(--text-3)' }}>
-        Archive routine
+        {t('archiveRoutine')}
       </Btn>
-      <Sheet open={open} onClose={() => setOpen(false)} title="Archive routine?">
+      <Sheet open={open} onClose={() => setOpen(false)} title={t('archiveTitle')}>
         <p style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.5, marginTop: 0 }}>
-          “{name}” will be hidden from your routines. Your workout history is kept, and you can restore it
-          anytime from <strong>Archived routines</strong>.
+          {t('archiveBody', { name })}
         </p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
-          <Btn kind="ghost" onClick={() => setOpen(false)}>Cancel</Btn>
-          <Btn icon="trash" onClick={archive} disabled={pending}>{pending ? 'Archiving…' : 'Archive'}</Btn>
+          <Btn kind="ghost" onClick={() => setOpen(false)}>{t('cancel')}</Btn>
+          <Btn icon="trash" onClick={archive} disabled={pending}>{pending ? t('archiving') : t('archive')}</Btn>
         </div>
       </Sheet>
     </>

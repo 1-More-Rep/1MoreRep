@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import type { PhotoLite } from './PhotoGrid';
 
 const selectStyle: React.CSSProperties = {
@@ -16,6 +17,7 @@ const selectStyle: React.CSSProperties = {
 
 /** Before/after compare slider with a draggable divider and keyboard range fallback. */
 export function PhotoCompare({ photos }: { photos: PhotoLite[] }) {
+  const t = useTranslations('progress');
   const sorted = [...photos].sort((a, b) => a.takenAt.localeCompare(b.takenAt));
   const [beforeId, setBeforeId] = useState(sorted[0]!.id);
   const [afterId, setAfterId] = useState(sorted[sorted.length - 1]!.id);
@@ -27,14 +29,14 @@ export function PhotoCompare({ photos }: { photos: PhotoLite[] }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--text-3)' }}>
-          Before
-          <select aria-label="Before photo" value={beforeId} onChange={(e) => setBeforeId(e.target.value)} style={selectStyle}>
+          {t('before')}
+          <select aria-label={t('beforePhoto')} value={beforeId} onChange={(e) => setBeforeId(e.target.value)} style={selectStyle}>
             {sorted.map((p) => <option key={p.id} value={p.id}>{label(p)}</option>)}
           </select>
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--text-3)' }}>
-          After
-          <select aria-label="After photo" value={afterId} onChange={(e) => setAfterId(e.target.value)} style={selectStyle}>
+          {t('after')}
+          <select aria-label={t('afterPhoto')} value={afterId} onChange={(e) => setAfterId(e.target.value)} style={selectStyle}>
             {sorted.map((p) => <option key={p.id} value={p.id}>{label(p)}</option>)}
           </select>
         </label>
@@ -43,12 +45,12 @@ export function PhotoCompare({ photos }: { photos: PhotoLite[] }) {
       <div style={{ position: 'relative', width: '100%', maxWidth: 360, aspectRatio: '3 / 4', borderRadius: 'var(--r-sm)', overflow: 'hidden', border: '1px solid var(--line)', userSelect: 'none' }}>
         {/* after = base layer */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`/api/photos/${afterId}`} alt="After" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img src={`/api/photos/${afterId}`} alt={t('after')} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         {/* before = clipped overlay */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={`/api/photos/${beforeId}`}
-          alt="Before"
+          alt={t('before')}
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', clipPath: `inset(0 ${100 - pos}% 0 0)` }}
         />
         <div aria-hidden style={{ position: 'absolute', top: 0, bottom: 0, left: `${pos}%`, width: 2, background: 'var(--accent)', transform: 'translateX(-1px)' }} />
@@ -60,7 +62,7 @@ export function PhotoCompare({ photos }: { photos: PhotoLite[] }) {
         max={100}
         value={pos}
         onChange={(e) => setPos(Number(e.target.value))}
-        aria-label="Compare position"
+        aria-label={t('comparePosition')}
         style={{ width: '100%', maxWidth: 360, accentColor: 'var(--accent)' }}
       />
     </div>

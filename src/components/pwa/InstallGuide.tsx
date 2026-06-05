@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useTranslations } from 'next-intl';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { SectionLabel } from '@/components/ui/typography';
 
@@ -10,53 +11,31 @@ interface Step {
   body: ReactNode;
 }
 
-const IOS_STEPS: Step[] = [
-  {
-    icon: 'more',
-    title: 'Tap the Share button',
-    body: (
-      <>
-        In Safari, tap the <strong>Share</strong> icon (a square with an arrow pointing up) in the toolbar.
-      </>
-    ),
-  },
-  {
-    icon: 'plus',
-    title: 'Add to Home Screen',
-    body: (
-      <>
-        Scroll the share sheet and choose <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>.
-      </>
-    ),
-  },
-  {
-    icon: 'home',
-    title: 'Reopen from the Home Screen',
-    body: <>Close Safari and launch <strong>1MoreRep</strong> from the new Home Screen icon.</>,
-  },
-  {
-    icon: 'bolt',
-    title: 'Enable notifications',
-    body: <>Come back to this screen inside the installed app and tap <strong>Enable notifications</strong>.</>,
-  },
-];
-
 /**
  * Multi-step "Add to Home Screen" walkthrough for iOS/iPadOS users who aren't in
  * standalone mode yet (iOS only delivers web push to installed PWAs). Reusable —
  * surface anywhere a non-standalone iOS user should be guided to install.
  */
-export function InstallGuide({ steps = IOS_STEPS }: { steps?: Step[] }) {
+export function InstallGuide({ steps }: { steps?: Step[] }) {
+  const t = useTranslations('settingsPages');
+  const bold = (chunks: ReactNode) => <strong>{chunks}</strong>;
+  const iosSteps: Step[] = [
+    { icon: 'more', title: t('stepShareTitle'), body: t.rich('stepShareBody', { strong: bold }) },
+    { icon: 'plus', title: t('stepAddTitle'), body: t.rich('stepAddBody', { strong: bold }) },
+    { icon: 'home', title: t('stepReopenTitle'), body: t.rich('stepReopenBody', { strong: bold }) },
+    { icon: 'bolt', title: t('stepEnableTitle'), body: t.rich('stepEnableBody', { strong: bold }) },
+  ];
+  const resolvedSteps = steps ?? iosSteps;
   return (
     <div data-testid="install-guide" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div>
-        <SectionLabel>Install to get notifications</SectionLabel>
+        <SectionLabel>{t('installToGetNotifications')}</SectionLabel>
         <p style={{ fontSize: 13.5, color: 'var(--text-2)', margin: '6px 0 0', lineHeight: 1.45 }}>
-          On iPhone &amp; iPad, push notifications only work after you add 1MoreRep to your Home Screen.
+          {t('installIntro')}
         </p>
       </div>
       <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {steps.map((step, i) => (
+        {resolvedSteps.map((step, i) => (
           <li
             key={i}
             style={{

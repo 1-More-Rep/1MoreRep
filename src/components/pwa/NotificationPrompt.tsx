@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { requestAndSubscribe } from '@/lib/pwa/pushClient';
 import { Btn, Icon, Sheet, useToast } from '@/components/ui';
 
@@ -13,6 +14,7 @@ import { Btn, Icon, Sheet, useToast } from '@/components/ui';
  * key) re-arms the prompt.
  */
 export function NotificationPrompt({ vapidPublicKey, userId }: { vapidPublicKey: string | null; userId: string }) {
+  const t = useTranslations('notifPrompt');
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -73,13 +75,13 @@ export function NotificationPrompt({ vapidPublicKey, userId }: { vapidPublicKey:
     setBusy(false);
     remember(); // asked-once, regardless of outcome
     setOpen(false);
-    if (res === 'granted') toast('Notifications enabled.', 'success');
-    else if (res === 'denied') toast('You can enable notifications anytime in Settings.', 'info');
-    else toast('Could not enable notifications.', 'error');
+    if (res === 'granted') toast(t('enabled'), 'success');
+    else if (res === 'denied') toast(t('declined'), 'info');
+    else toast(t('failed'), 'error');
   }
 
   return (
-    <Sheet open={open} onClose={dismiss} title="Turn on notifications?">
+    <Sheet open={open} onClose={dismiss} title={t('title')}>
       <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
         <span
           aria-hidden
@@ -98,13 +100,12 @@ export function NotificationPrompt({ vapidPublicKey, userId }: { vapidPublicKey:
           <Icon name="bolt" size={22} stroke={2} />
         </span>
         <p style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.5, margin: 0 }}>
-          Get nudges for streak reminders, rest timers and friend activity. You can change this
-          anytime in Settings.
+          {t('body')}
         </p>
       </div>
       <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-        <Btn kind="ghost" onClick={dismiss} disabled={busy}>Not now</Btn>
-        <Btn icon="bolt" onClick={enable} disabled={busy}>{busy ? 'Enabling…' : 'Enable'}</Btn>
+        <Btn kind="ghost" onClick={dismiss} disabled={busy}>{t('notNow')}</Btn>
+        <Btn icon="bolt" onClick={enable} disabled={busy}>{busy ? t('enabling') : t('enable')}</Btn>
       </div>
     </Sheet>
   );

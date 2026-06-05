@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import type { Muscle } from '@/domain/muscles/taxonomy';
 import { Segmented } from '@/components/ui/Segmented';
 
@@ -24,6 +25,7 @@ export function BodyMap({
   onSelect?: (m: Muscle) => void;
   selected?: Muscle | null;
 }) {
+  const t = useTranslations('muscles');
   const [view, setView] = useState<View>('front');
 
   function Region({ muscle, children }: { muscle: Muscle; children: React.ReactNode }) {
@@ -55,18 +57,18 @@ export function BodyMap({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
       <Segmented<View>
-        ariaLabel="Body view"
+        ariaLabel={t('bodyView')}
         size="sm"
         value={view}
         onChange={setView}
         options={[
-          { value: 'front', label: 'Front' },
-          { value: 'back', label: 'Back' },
+          { value: 'front', label: t('front') },
+          { value: 'back', label: t('back') },
         ]}
         style={{ width: 180 }}
       />
 
-      <svg role="img" viewBox="0 0 120 250" width="100%" style={{ maxWidth: 280, display: 'block' }} aria-label={`${title}, ${view} view`}>
+      <svg role="img" viewBox="0 0 120 250" width="100%" style={{ maxWidth: 280, display: 'block' }} aria-label={t('mapAria', { title, view: view === 'front' ? t('front') : t('back') })}>
         {/* silhouette (non-interactive so muscle regions own the clicks) */}
         <g className="bodymap-silhouette" style={{ fill: 'var(--surface)', stroke: 'var(--line)', strokeWidth: 1 }}>
           <ellipse cx="60" cy="22" rx="13" ry="15" /> {/* head */}

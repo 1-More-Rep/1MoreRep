@@ -1,22 +1,24 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { getCurrentUser, hasRole } from '@/lib/auth/guards';
 import { Icon } from '@/components/ui/Icon';
 import { ImpersonationBanner } from '@/components/admin/ImpersonationBanner';
-
-const NAV = [
-  { href: '/admin', label: 'Dashboard', icon: 'chart' as const },
-  { href: '/admin/users', label: 'Users', icon: 'user' as const },
-  { href: '/admin/feedback', label: 'Feedback', icon: 'heart' as const },
-  { href: '/admin/settings', label: 'Settings', icon: 'settings' as const },
-  { href: '/admin/audit', label: 'Audit log', icon: 'history' as const },
-];
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect('/login');
   if (!hasRole(user, 'ADMIN')) redirect('/app');
+
+  const t = await getTranslations('admin');
+  const NAV = [
+    { href: '/admin', label: t('navDashboard'), icon: 'chart' as const },
+    { href: '/admin/users', label: t('navUsers'), icon: 'user' as const },
+    { href: '/admin/feedback', label: t('navFeedback'), icon: 'heart' as const },
+    { href: '/admin/settings', label: t('navSettings'), icon: 'settings' as const },
+    { href: '/admin/audit', label: t('navAuditLog'), icon: 'history' as const },
+  ];
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--bg)' }}>
@@ -33,7 +35,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             <span style={{ width: 30, height: 30, borderRadius: 'var(--r-xs)', background: 'var(--accent)', color: 'var(--on-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Icon name="bolt" size={17} stroke={2.1} />
             </span>
-            <strong style={{ fontSize: 15 }}>Admin</strong>
+            <strong style={{ fontSize: 15 }}>{t('brand')}</strong>
           </Link>
           <nav style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {NAV.map((n) => (
@@ -57,7 +59,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             ))}
           </nav>
           <Link href="/app" style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>
-            ← Back to app
+            {t('backToApp')}
           </Link>
         </div>
       </header>

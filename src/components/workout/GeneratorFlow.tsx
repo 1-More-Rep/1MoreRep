@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useFormStatus } from 'react-dom';
+import { useTranslations } from 'next-intl';
 import type { Equipment } from '@prisma/client';
 import {
   generatePlanAction,
@@ -21,16 +22,12 @@ import { Chip } from '@/components/ui/Chip';
 import { Icon } from '@/components/ui/Icon';
 import { Mono, SectionLabel } from '@/components/ui/typography';
 
-const GOALS: { value: GenGoal; label: string }[] = [
-  { value: 'HYPERTROPHY', label: 'Hypertrophy' },
-  { value: 'STRENGTH', label: 'Strength' },
-  { value: 'ENDURANCE', label: 'Endurance' },
-  { value: 'GENERAL', label: 'General' },
-];
+const GOALS: GenGoal[] = ['HYPERTROPHY', 'STRENGTH', 'ENDURANCE', 'GENERAL'];
 const TIMES = [30, 45, 60, 90];
 const EQUIP: Equipment[] = ['BARBELL', 'DUMBBELL', 'MACHINE', 'CABLE', 'BODYWEIGHT', 'KETTLEBELL', 'BAND'];
 
 export function GeneratorFlow({ initialGoal, unitSystem }: { initialGoal?: GenGoal; unitSystem: UnitSystemLike }) {
+  const t = useTranslations('workout');
   const [goal, setGoal] = useState<GenGoal>(initialGoal ?? 'HYPERTROPHY');
   const [time, setTime] = useState(60);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -60,10 +57,10 @@ export function GeneratorFlow({ initialGoal, unitSystem }: { initialGoal?: GenGo
     start(async () => {
       try {
         const r = await generatePlanAction(inputs());
-        if (r.plan.exercises.length === 0) setError('No exercises matched. Try different equipment or more time.');
+        if (r.plan.exercises.length === 0) setError(t('genNoMatch'));
         setResult(r);
       } catch {
-        setError('Could not generate a workout. Try again.');
+        setError(t('genFailed'));
       }
     });
   }
@@ -76,7 +73,7 @@ export function GeneratorFlow({ initialGoal, unitSystem }: { initialGoal?: GenGo
         const r = await swapExerciseAction(inputs(), result.plan, index);
         setResult(r);
       } catch {
-        setError('Could not swap that exercise. Try again.');
+        setError(t('swapFailed'));
       }
     });
   }
@@ -89,7 +86,7 @@ export function GeneratorFlow({ initialGoal, unitSystem }: { initialGoal?: GenGo
         const r = await adjustDifficultyAction(result.plan, direction);
         setResult(r);
       } catch {
-        setError('Could not adjust the difficulty. Try again.');
+        setError(t('adjustFailed'));
       }
     });
   }
@@ -100,7 +97,7 @@ export function GeneratorFlow({ initialGoal, unitSystem }: { initialGoal?: GenGo
         {/* Swap/adjust failures land here instead of throwing up to the error boundary. */}
         {error && <div role="alert"><Chip style={{ color: '#c0392b' }}>{error}</Chip></div>}
         <Card style={{ borderColor: 'var(--accent-line)' }}>
-          <SectionLabel style={{ marginBottom: 8 }}>Why this workout</SectionLabel>
+          <SectionLabel style={{ marginBottom: 8 }}>{t('whyThisWorkout')}</SectionLabel>
           <p data-testid="gen-explanation" style={{ fontSize: 14.5, lineHeight: 1.5, color: 'var(--text-2)', margin: 0 }}>{result.explanation}</p>
         </Card>
 
@@ -111,14 +108,14 @@ export function GeneratorFlow({ initialGoal, unitSystem }: { initialGoal?: GenGo
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{ex.name}</div>
                 <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
-                  {MUSCLE_LABEL[ex.primaryMuscle]}{ex.supersetGroup != null ? ' · superset' : ''}
+                  {MUSCLE_LABEL[ex.primaryMuscle]}{ex.supersetGroup != null ? ` · ${t('supersetSuffix')}` : ''}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <Mono style={{ fontSize: 14, fontWeight: 600, display: 'block' }}>{ex.sets} × {ex.repLow}–{ex.repHigh}</Mono>
                 {ex.loadSuggestionKg != null && <Mono style={{ fontSize: 11.5, color: 'var(--text-3)' }}>~{formatWeight(ex.loadSuggestionKg, unitSystem)} {weightUnit(unitSystem)}</Mono>}
               </div>
-              <button onClick={() => swap(i)} disabled={pending} aria-label={`Swap ${ex.name}`} title="Swap exercise" style={{ background: 'none', border: '1px solid var(--line-2)', borderRadius: 'var(--r-sm)', height: 34, width: 34, color: 'var(--text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <button onClick={() => swap(i)} disabled={pending} aria-label={t('swapExercise', { name: ex.name })} title={t('swapExerciseTitle')} style={{ background: 'none', border: '1px solid var(--line-2)', borderRadius: 'var(--r-sm)', height: 34, width: 34, color: 'var(--text-3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Icon name="repeat" size={15} />
               </button>
             </div>
@@ -126,18 +123,18 @@ export function GeneratorFlow({ initialGoal, unitSystem }: { initialGoal?: GenGo
         </Card>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <SectionLabel>Difficulty</SectionLabel>
-          <Btn kind="soft" size="sm" disabled={pending} onClick={() => adjust('easier')}>Easier</Btn>
-          <Btn kind="soft" size="sm" disabled={pending} onClick={() => adjust('harder')}>Harder</Btn>
+          <SectionLabel>{t('difficulty')}</SectionLabel>
+          <Btn kind="soft" size="sm" disabled={pending} onClick={() => adjust('easier')}>{t('easier')}</Btn>
+          <Btn kind="soft" size="sm" disabled={pending} onClick={() => adjust('harder')}>{t('harder')}</Btn>
         </div>
 
         <div style={{ display: 'flex', gap: 10 }}>
           <form action={startFromPlanAction.bind(null, result.plan, goal)} style={{ flex: 1 }}>
             <StartWorkoutSubmit />
           </form>
-          <Btn kind="soft" size="lg" icon="repeat" disabled={pending} onClick={generate}>Regenerate</Btn>
+          <Btn kind="soft" size="lg" icon="repeat" disabled={pending} onClick={generate}>{t('regenerate')}</Btn>
         </div>
-        <Btn kind="ghost" size="sm" onClick={() => setResult(null)} style={{ alignSelf: 'center' }}>Change inputs</Btn>
+        <Btn kind="ghost" size="sm" onClick={() => setResult(null)} style={{ alignSelf: 'center' }}>{t('changeInputs')}</Btn>
       </div>
     );
   }
@@ -147,47 +144,47 @@ export function GeneratorFlow({ initialGoal, unitSystem }: { initialGoal?: GenGo
       {error && <div role="alert"><Chip style={{ color: '#c0392b' }}>{error}</Chip></div>}
 
       <div>
-        <SectionLabel style={{ marginBottom: 10 }}>Describe it (optional)</SectionLabel>
+        <SectionLabel style={{ marginBottom: 10 }}>{t('describeOptional')}</SectionLabel>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             value={freeText}
             onChange={(e) => setFreeText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyFreeText(); } }}
-            placeholder="e.g. 45 min dumbbell hypertrophy"
-            aria-label="Describe your workout"
+            placeholder={t('describePlaceholder')}
+            aria-label={t('describeAria')}
             style={{ flex: 1, height: 42, padding: '0 12px', borderRadius: 'var(--r-sm)', border: '1px solid var(--line-2)', background: 'var(--surface)', color: 'var(--text)', fontSize: 14, fontFamily: 'var(--font-sans)' }}
           />
-          <Btn kind="soft" size="sm" disabled={pending || !freeText.trim()} onClick={applyFreeText}>Fill</Btn>
+          <Btn kind="soft" size="sm" disabled={pending || !freeText.trim()} onClick={applyFreeText}>{t('fill')}</Btn>
         </div>
       </div>
 
       <div>
-        <SectionLabel style={{ marginBottom: 10 }}>Goal</SectionLabel>
+        <SectionLabel style={{ marginBottom: 10 }}>{t('goal')}</SectionLabel>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {GOALS.map((g) => (
-            <Btn key={g.value} kind={goal === g.value ? 'primary' : 'soft'} size="sm" onClick={() => setGoal(g.value)}>{g.label}</Btn>
+            <Btn key={g} kind={goal === g ? 'primary' : 'soft'} size="sm" onClick={() => setGoal(g)}>{t(`goal_${g}`)}</Btn>
           ))}
         </div>
       </div>
       <div>
-        <SectionLabel style={{ marginBottom: 10 }}>Time available</SectionLabel>
+        <SectionLabel style={{ marginBottom: 10 }}>{t('timeAvailable')}</SectionLabel>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {TIMES.map((t) => (
-            <Btn key={t} kind={time === t ? 'primary' : 'soft'} size="sm" onClick={() => setTime(t)}>{t} min</Btn>
+          {TIMES.map((tm) => (
+            <Btn key={tm} kind={time === tm ? 'primary' : 'soft'} size="sm" onClick={() => setTime(tm)}>{t('minutes', { min: tm })}</Btn>
           ))}
         </div>
       </div>
       <div>
-        <SectionLabel style={{ marginBottom: 10 }}>Equipment (none = all)</SectionLabel>
+        <SectionLabel style={{ marginBottom: 10 }}>{t('equipmentNoneAll')}</SectionLabel>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {EQUIP.map((e) => (
             <Btn key={e} kind={equipment.includes(e) ? 'primary' : 'soft'} size="sm" onClick={() => toggleEquip(e)}>
-              {e.charAt(0) + e.slice(1).toLowerCase()}
+              {t(`equip_${e}`)}
             </Btn>
           ))}
         </div>
       </div>
-      <Btn size="lg" icon="bolt" disabled={pending} onClick={generate}>{pending ? 'Generating…' : 'Generate workout'}</Btn>
+      <Btn size="lg" icon="bolt" disabled={pending} onClick={generate}>{pending ? t('generating') : t('generateWorkout')}</Btn>
     </Card>
   );
 }
@@ -197,10 +194,11 @@ export function GeneratorFlow({ initialGoal, unitSystem }: { initialGoal?: GenGo
  * button while the server action is in flight so a double-tap can't start two sessions.
  */
 function StartWorkoutSubmit() {
+  const t = useTranslations('workout');
   const { pending } = useFormStatus();
   return (
     <Btn type="submit" full size="lg" icon="play" disabled={pending}>
-      {pending ? 'Starting…' : 'Start this workout'}
+      {pending ? t('starting') : t('startThisWorkout')}
     </Btn>
   );
 }

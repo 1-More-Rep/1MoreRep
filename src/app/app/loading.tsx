@@ -3,9 +3,12 @@
  * DB queries before rendering; this skeleton ships immediately so navigation doesn't
  * show frozen/stale content while the server work runs.
  */
-export default function Loading() {
+import { getTranslations } from 'next-intl/server';
+
+export default async function Loading() {
+  const t = await getTranslations('today');
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)', padding: 'var(--screen-pad)' }} aria-busy="true" aria-label="Loading">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)', padding: 'var(--screen-pad)' }} aria-busy="true" aria-label={t('loading')}>
       {[0, 1, 2, 3].map((i) => (
         <div
           key={i}

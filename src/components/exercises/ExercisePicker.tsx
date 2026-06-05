@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { searchExercisesAction, type PickerExercise } from '@/server/actions/exercises';
 import { IconTile, type IconName } from '@/components/ui/Icon';
 import { Btn } from '@/components/ui/Btn';
@@ -9,7 +10,9 @@ import { Btn } from '@/components/ui/Btn';
  * Search + add an exercise. `onAdd` is a bound server action (e.g.
  * addRoutineItemAction.bind(null, routineId)).
  */
-export function ExercisePicker({ onAdd, label = 'Add exercise' }: { onAdd: (exerciseId: string) => Promise<void>; onAddLabel?: string; label?: string }) {
+export function ExercisePicker({ onAdd, label }: { onAdd: (exerciseId: string) => Promise<void>; onAddLabel?: string; label?: string }) {
+  const t = useTranslations('exercises');
+  const addLabel = label ?? t('addExercise');
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [results, setResults] = useState<PickerExercise[]>([]);
@@ -26,7 +29,7 @@ export function ExercisePicker({ onAdd, label = 'Add exercise' }: { onAdd: (exer
   if (!open) {
     return (
       <Btn kind="soft" icon="plus" onClick={() => setOpen(true)}>
-        {label}
+        {addLabel}
       </Btn>
     );
   }
@@ -38,15 +41,15 @@ export function ExercisePicker({ onAdd, label = 'Add exercise' }: { onAdd: (exer
           autoFocus
           type="search"
           value={q}
-          placeholder="Search exercises…"
-          aria-label="Search exercises to add"
+          placeholder={t('searchPlaceholder')}
+          aria-label={t('searchToAddAria')}
           onChange={(e) => setQ(e.target.value)}
           style={{ flex: 1, height: 42, padding: '0 12px', borderRadius: 'var(--r-sm)', border: '1px solid var(--line-2)', background: 'var(--surface)', color: 'var(--text)', fontSize: 14.5 }}
         />
-        <Btn kind="ghost" icon="x" onClick={() => setOpen(false)} aria-label="Close" />
+        <Btn kind="ghost" icon="x" onClick={() => setOpen(false)} aria-label={t('close')} />
       </div>
       <div style={{ maxHeight: 320, overflow: 'auto' }}>
-        {results.length === 0 && <div style={{ padding: 'var(--pad)', color: 'var(--text-3)', fontSize: 14 }}>Type to search…</div>}
+        {results.length === 0 && <div style={{ padding: 'var(--pad)', color: 'var(--text-3)', fontSize: 14 }}>{t('typeToSearch')}</div>}
         {results.map((ex) => (
           <button
             key={ex.id}

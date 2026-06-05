@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import { acceptInviteAction } from '@/server/actions/social';
 import { Btn, Icon } from '@/components/ui';
 import { Alert } from '@/components/auth/ui';
@@ -12,6 +13,7 @@ import { Alert } from '@/components/auth/ui';
  * a link prefetch or accidental visit must not silently create a friendship.
  */
 export function AcceptInvite({ code, inviterName }: { code: string; inviterName: string }) {
+  const t = useTranslations('invite');
   const router = useRouter();
   const [pending, start] = useTransition();
   const [result, setResult] = useState<{ error?: string; ok?: boolean } | null>(null);
@@ -40,8 +42,8 @@ export function AcceptInvite({ code, inviterName }: { code: string; inviterName:
         >
           <Icon name="check" size={24} stroke={2} />
         </span>
-        <div style={{ fontSize: 16, fontWeight: 600 }}>You and {inviterName} are now friends!</div>
-        <Btn href="/app/profile/friends" icon="users">Go to friends</Btn>
+        <div style={{ fontSize: 16, fontWeight: 600 }}>{t('nowFriends', { name: inviterName })}</div>
+        <Btn href="/app/profile/friends" icon="users">{t('goToFriends')}</Btn>
       </div>
     );
   }
@@ -63,14 +65,14 @@ export function AcceptInvite({ code, inviterName }: { code: string; inviterName:
         <Icon name="users" size={24} stroke={2} />
       </span>
       <div style={{ fontSize: 16, fontWeight: 600 }}>
-        <strong>{inviterName}</strong> invited you to connect on 1MoreRep.
+        {t('invitedYou', { name: inviterName })}
       </div>
       {result?.error && <Alert kind="error">{result.error}</Alert>}
       <div style={{ display: 'flex', gap: 10 }}>
         <Btn icon="check" onClick={accept} disabled={pending}>
-          {pending ? 'Accepting…' : 'Accept invite'}
+          {pending ? t('accepting') : t('accept')}
         </Btn>
-        <Btn kind="ghost" onClick={() => router.push('/app')}>Not now</Btn>
+        <Btn kind="ghost" onClick={() => router.push('/app')}>{t('notNow')}</Btn>
       </div>
     </div>
   );

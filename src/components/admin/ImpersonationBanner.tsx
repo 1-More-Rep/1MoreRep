@@ -1,3 +1,4 @@
+import { getTranslations } from 'next-intl/server';
 import { getImpersonation } from '@/lib/auth/guards';
 import { StopImpersonatingButton } from './StopImpersonatingButton';
 
@@ -8,6 +9,7 @@ import { StopImpersonatingButton } from './StopImpersonatingButton';
 export async function ImpersonationBanner() {
   const imp = await getImpersonation();
   if (!imp) return null;
+  const t = await getTranslations('admin');
   return (
     <div
       role="status"
@@ -28,7 +30,7 @@ export async function ImpersonationBanner() {
       }}
     >
       <span>
-        Viewing as <strong>{imp.user.displayName}</strong> ({imp.user.email})
+        {t('viewingAs')} <strong>{imp.user.displayName}</strong> {t('viewingAsEmail', { email: imp.user.email })}
       </span>
       <StopImpersonatingButton />
     </div>

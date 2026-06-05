@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { sendTestPushAction, unsubscribePushAction } from '@/server/actions/push';
 import { detectPushCapability, type PushCapability } from '@/lib/pwa/ios';
 import { requestAndSubscribe } from '@/lib/pwa/pushClient';
@@ -10,6 +11,7 @@ import { SectionLabel } from '@/components/ui/typography';
 import { InstallGuide } from './InstallGuide';
 
 export function PushManager({ vapidPublicKey }: { vapidPublicKey: string | null }) {
+  const t = useTranslations('settingsPages');
   const [cap, setCap] = useState<PushCapability | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -31,18 +33,18 @@ export function PushManager({ vapidPublicKey }: { vapidPublicKey: string | null 
     const res = await requestAndSubscribe(vapidPublicKey);
     if (res === 'granted') {
       setSubscribed(true);
-      setMsg('Notifications enabled.');
+      setMsg(t('msgEnabled'));
     } else if (res === 'denied') {
-      setMsg('Notifications were not allowed.');
+      setMsg(t('msgNotAllowed'));
     } else {
-      setMsg('Could not enable notifications.');
+      setMsg(t('msgCouldNotEnable'));
     }
     setBusy(false);
   }
 
   async function test() {
     const r = await sendTestPushAction();
-    setMsg(r.sent > 0 ? 'Test sent.' : r.reason === 'vapid-not-configured' ? 'Push is not configured by the admin.' : 'No active device subscriptions.');
+    setMsg(r.sent > 0 ? t('msgTestSent') : r.reason === 'vapid-not-configured' ? t('msgNotConfiguredAdmin') : t('msgNoSubscriptions'));
   }
 
   async function disable() {
@@ -56,9 +58,9 @@ export function PushManager({ vapidPublicKey }: { vapidPublicKey: string | null 
         await sub.unsubscribe().catch(() => {});
       }
       setSubscribed(false);
-      setMsg('Notifications disabled.');
+      setMsg(t('msgDisabled'));
     } catch {
-      setMsg('Could not disable notifications.');
+      setMsg(t('msgCouldNotDisable'));
     } finally {
       setBusy(false);
     }
@@ -66,20 +68,20 @@ export function PushManager({ vapidPublicKey }: { vapidPublicKey: string | null 
 
   return (
     <div data-testid="push-manager" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <SectionLabel>Push notifications</SectionLabel>
+      <SectionLabel>{t('pushNotifications')}</SectionLabel>
       {!vapidPublicKey ? (
-        <Chip>Push isn&apos;t configured on this instance yet.</Chip>
+        <Chip>{t('pushNotConfigured')}</Chip>
       ) : cap === 'needs-install' ? (
         <InstallGuide />
       ) : cap === 'unsupported' ? (
-        <Chip>This browser doesn&apos;t support push notifications.</Chip>
+        <Chip>{t('pushUnsupported')}</Chip>
       ) : (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <Btn kind={subscribed ? 'soft' : 'primary'} size="sm" icon="bolt" disabled={busy} onClick={enable}>
-            {subscribed ? 'Notifications on' : 'Enable notifications'}
+            {subscribed ? t('notificationsOn') : t('enableNotifications')}
           </Btn>
-          {subscribed && <Btn kind="ghost" size="sm" onClick={test}>Send test</Btn>}
-          {subscribed && <Btn kind="ghost" size="sm" disabled={busy} onClick={disable}>Disable</Btn>}
+          {subscribed && <Btn kind="ghost" size="sm" onClick={test}>{t('sendTest')}</Btn>}
+          {subscribed && <Btn kind="ghost" size="sm" disabled={busy} onClick={disable}>{t('disable')}</Btn>}
         </div>
       )}
       {msg && <span style={{ fontSize: 13, color: 'var(--text-2)' }}>{msg}</span>}

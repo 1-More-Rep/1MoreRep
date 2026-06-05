@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { getExercise, getExerciseSetHistory } from '@/server/queries/exercises';
 import { MUSCLE_LABEL, type Muscle } from '@/domain/muscles/taxonomy';
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic';
 const short = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 export default async function ExerciseDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = await getTranslations('exercises');
   const user = await requireUser();
   const { id } = await params;
   const ex = await getExercise(id, user.id);
@@ -29,7 +31,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
       <Link href="/app/exercises" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>
-        ← Exercises
+        ← {t('title')}
       </Link>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -40,13 +42,13 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
             <Chip>{ex.equipment.toLowerCase().replace('_', ' ')}</Chip>
             {ex.mechanic && <Chip>{ex.mechanic.toLowerCase()}</Chip>}
             {ex.level && <Chip>{ex.level}</Chip>}
-            {ex.isCustom && <Chip accent>custom</Chip>}
+            {ex.isCustom && <Chip accent>{t('custom')}</Chip>}
           </div>
         </div>
       </div>
 
       <Card>
-        <SectionLabel style={{ marginBottom: 14 }}>Muscles worked</SectionLabel>
+        <SectionLabel style={{ marginBottom: 14 }}>{t('musclesWorked')}</SectionLabel>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {links.map((m) => (
             <div key={m.muscle} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -63,23 +65,23 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
       </Card>
 
       <Card>
-        <SectionLabel style={{ marginBottom: 14 }}>Est. 1RM trend</SectionLabel>
+        <SectionLabel style={{ marginBottom: 14 }}>{t('est1rmTrend')}</SectionLabel>
         {trend.length > 0 ? (
           <>
             <LineChart points={trend} unit="kg" />
             {lowConfidence && (
-              <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 8 }}>Points with &gt;12 reps are lower-confidence estimates.</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-3)', marginTop: 8 }}>{t('lowConfidenceNote')}</div>
             )}
           </>
         ) : (
-          <div style={{ color: 'var(--text-3)', fontSize: 14, padding: '20px 0' }}>No sets logged yet — finish a workout with this exercise.</div>
+          <div style={{ color: 'var(--text-3)', fontSize: 14, padding: '20px 0' }}>{t('noSetsYet')}</div>
         )}
       </Card>
 
       <Card>
-        <SectionLabel style={{ marginBottom: 14 }}>Muscle map</SectionLabel>
+        <SectionLabel style={{ marginBottom: 14 }}>{t('muscleMap')}</SectionLabel>
         <BodyMap
-          title="Muscles worked"
+          title={t('musclesWorked')}
           tint={(m) => {
             const w = involvement[m] ?? 0;
             return w > 0
@@ -87,22 +89,24 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
               : 'var(--surface-2)';
           }}
           regionLabel={(m) =>
-            involvement[m] ? `${MUSCLE_LABEL[m]}, ${Math.round(involvement[m]! * 100)}% involvement` : MUSCLE_LABEL[m]
+            involvement[m]
+              ? t('regionInvolvement', { muscle: MUSCLE_LABEL[m], pct: Math.round(involvement[m]! * 100) })
+              : MUSCLE_LABEL[m]
           }
         />
       </Card>
 
       <Card>
-        <SectionLabel style={{ marginBottom: 14 }}>Default scheme</SectionLabel>
+        <SectionLabel style={{ marginBottom: 14 }}>{t('defaultScheme')}</SectionLabel>
         <div style={{ display: 'flex', gap: 20 }}>
-          <div><Mono style={{ fontSize: 18, fontWeight: 700 }}>{ex.defaultSets} × {ex.defaultRepLow}–{ex.defaultRepHigh}</Mono><div style={{ fontSize: 12, color: 'var(--text-3)' }}>sets × reps</div></div>
-          <div><Mono style={{ fontSize: 18, fontWeight: 700 }}>{ex.defaultRestSec}s</Mono><div style={{ fontSize: 12, color: 'var(--text-3)' }}>rest</div></div>
+          <div><Mono style={{ fontSize: 18, fontWeight: 700 }}>{ex.defaultSets} × {ex.defaultRepLow}–{ex.defaultRepHigh}</Mono><div style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('setsByReps')}</div></div>
+          <div><Mono style={{ fontSize: 18, fontWeight: 700 }}>{ex.defaultRestSec}s</Mono><div style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('rest')}</div></div>
         </div>
       </Card>
 
       {ex.instructions.length > 0 && (
         <Card>
-          <SectionLabel style={{ marginBottom: 14 }}>Instructions</SectionLabel>
+          <SectionLabel style={{ marginBottom: 14 }}>{t('instructions')}</SectionLabel>
           <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {ex.instructions.map((step, i) => (
               <li key={i} style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--text-2)' }}>{step}</li>

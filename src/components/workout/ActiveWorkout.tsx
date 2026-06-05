@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   addExerciseAction,
   addSetAction,
@@ -34,14 +35,14 @@ function fmt(secs: number) {
 }
 
 /** Local (client-side) rest-timer-done notification. Best-effort, permission-gated. */
-function notifyRestDone() {
+function notifyRestDone(title: string, body: string) {
   if (typeof window === 'undefined' || typeof Notification === 'undefined') return;
   if (Notification.permission !== 'granted') return;
   if (!('serviceWorker' in navigator)) return;
   navigator.serviceWorker.ready
     .then((reg) =>
-      reg.showNotification('Rest complete', {
-        body: 'Time for your next set 💪',
+      reg.showNotification(title, {
+        body,
         icon: '/icons/icon-192.png',
         // Monochrome transparent badge for the Android status bar (see public/sw.js).
         badge: '/icons/badge-96.png',
@@ -52,6 +53,7 @@ function notifyRestDone() {
 }
 
 export function ActiveWorkout({ session, unitSystem }: { session: ActiveSessionData; unitSystem: UnitSystemLike }) {
+  const t = useTranslations('workout');
   const [entries, setEntries] = useState<UIEntry[]>(session.entries);
   const wUnit = weightUnit(unitSystem);
   const [, startTx] = useTransition();
@@ -71,7 +73,7 @@ export function ActiveWorkout({ session, unitSystem }: { session: ActiveSessionD
         await fn();
         setSyncErr(null);
       } catch {
-        setSyncErr('Couldn’t save your last change — check your connection, then refresh to re-sync.');
+        setSyncErr(t('syncErrorSave'));
       }
     });
   }
@@ -88,11 +90,11 @@ export function ActiveWorkout({ session, unitSystem }: { session: ActiveSessionD
       setRestLeft(left);
       if (left <= 0) {
         setRest(null);
-        notifyRestDone();
+        notifyRestDone(t('restCompleteTitle'), t('restCompleteBody'));
       }
     }, 250);
     return () => clearInterval(id);
-  }, [rest]);
+  }, [rest, t]);
 
   const doneCount = useMemo(
     () => entries.reduce((n, e) => n + e.sets.filter((s) => s.completed && !s.isWarmup).length, 0),
@@ -141,7 +143,7 @@ export function ActiveWorkout({ session, unitSystem }: { session: ActiveSessionD
       setEntries((prev) => [...prev, created]);
       setSyncErr(null);
     } catch {
-      setSyncErr('Couldn’t add that exercise — check your connection and try again.');
+      setSyncErr(t('syncErrorAdd'));
     }
   }
 
@@ -178,16 +180,16 @@ export function ActiveWorkout({ session, unitSystem }: { session: ActiveSessionD
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
           <div>
-            <SectionLabel>In progress</SectionLabel>
-            <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-.015em' }}>{session.name ?? 'Workout'}</div>
+            <SectionLabel>{t('inProgress')}</SectionLabel>
+            <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-.015em' }}>{session.name ?? t('workoutFallback')}</div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <Chip accent>
               <span style={{ width: 6, height: 6, borderRadius: 99, background: 'var(--accent)' }} />
               <Mono>{fmt(elapsed)}</Mono>
             </Chip>
-            <Chip><Mono>{doneCount}</Mono>&nbsp;sets</Chip>
-            <Btn kind="ghost" size="sm" icon="weight" onClick={() => setPlateOpen((v) => !v)}>Plates</Btn>
+            <Chip><Mono>{doneCount}</Mono>&nbsp;{t('setsLabel')}</Chip>
+            <Btn kind="ghost" size="sm" icon="weight" onClick={() => setPlateOpen((v) => !v)}>{t('plates')}</Btn>
           </div>
         </div>
         {plateOpen && <PlateCalc />}
@@ -199,7 +201,7 @@ export function ActiveWorkout({ session, unitSystem }: { session: ActiveSessionD
           <div role="alert" style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: '#c0392b' }}>
             <Icon name="x" size={16} />
             <span style={{ flex: 1 }}>{syncErr}</span>
-            <Btn kind="ghost" size="sm" onClick={() => window.location.reload()}>Refresh</Btn>
+            <Btn kind="ghost" size="sm" onClick={() => window.location.reload()}>{t('refresh')}</Btn>
           </div>
         </Card>
       )}
@@ -211,15 +213,15 @@ export function ActiveWorkout({ session, unitSystem }: { session: ActiveSessionD
             <Icon name="timer" size={20} />
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <SectionLabel>Rest</SectionLabel>
+                <SectionLabel>{t('rest')}</SectionLabel>
                 <Mono style={{ fontWeight: 700 }}>{fmt(restLeft)}</Mono>
               </div>
               <div style={{ height: 6, background: 'var(--surface-2)', borderRadius: 99, overflow: 'hidden' }}>
                 <div style={{ width: `${(restLeft / rest.total) * 100}%`, height: '100%', background: 'var(--accent)' }} />
               </div>
             </div>
-            <Btn kind="ghost" size="sm" onClick={() => setRest({ ends: rest.ends + 15000, total: rest.total + 15 })}>+15s</Btn>
-            <Btn kind="ghost" size="sm" onClick={() => setRest(null)}>Skip</Btn>
+            <Btn kind="ghost" size="sm" onClick={() => setRest({ ends: rest.ends + 15000, total: rest.total + 15 })}>{t('restAdd15')}</Btn>
+            <Btn kind="ghost" size="sm" onClick={() => setRest(null)}>{t('skip')}</Btn>
           </div>
         </Card>
       )}
@@ -232,7 +234,7 @@ export function ActiveWorkout({ session, unitSystem }: { session: ActiveSessionD
         <div key={entry.id}>
           {firstOfGroup && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 6px 4px', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--accent-text)' }}>
-              <Icon name="repeat" size={13} stroke={2} /> Superset
+              <Icon name="repeat" size={13} stroke={2} /> {t('superset')}
             </div>
           )}
         <Card pad={false} style={inSuperset ? { borderLeft: '3px solid var(--accent)' } : undefined}>
@@ -241,43 +243,43 @@ export function ActiveWorkout({ session, unitSystem }: { session: ActiveSessionD
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 15.5, fontWeight: 600 }}>{entry.exerciseName}</div>
               <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
-                target {entry.targetSets} × {entry.targetRepLow}–{entry.targetRepHigh} · {entry.targetRestSec}s
+                {t('targetLine', { sets: entry.targetSets, low: entry.targetRepLow, high: entry.targetRepHigh, rest: entry.targetRestSec })}
               </div>
             </div>
-            <button onClick={() => move(index, -1)} disabled={index === 0} aria-label={`Move ${entry.exerciseName} up`} style={{ ...iconBtn, opacity: index === 0 ? 0.4 : 1 }}>
+            <button onClick={() => move(index, -1)} disabled={index === 0} aria-label={t('moveUp', { name: entry.exerciseName })} style={{ ...iconBtn, opacity: index === 0 ? 0.4 : 1 }}>
               <Icon name="arrowUp" size={15} />
             </button>
-            <button onClick={() => move(index, 1)} disabled={index === entries.length - 1} aria-label={`Move ${entry.exerciseName} down`} style={{ ...iconBtn, opacity: index === entries.length - 1 ? 0.4 : 1, transform: 'rotate(180deg)' }}>
+            <button onClick={() => move(index, 1)} disabled={index === entries.length - 1} aria-label={t('moveDown', { name: entry.exerciseName })} style={{ ...iconBtn, opacity: index === entries.length - 1 ? 0.4 : 1, transform: 'rotate(180deg)' }}>
               <Icon name="arrowUp" size={15} />
             </button>
-            <button onClick={() => toggleSuperset(index)} aria-label={inSuperset ? `Clear superset on ${entry.exerciseName}` : `Superset ${entry.exerciseName}`} aria-pressed={inSuperset} style={{ ...iconBtn, color: inSuperset ? 'var(--accent-text)' : 'var(--text-3)', borderColor: inSuperset ? 'var(--accent-line)' : 'var(--line-2)' }}>
+            <button onClick={() => toggleSuperset(index)} aria-label={inSuperset ? t('clearSuperset', { name: entry.exerciseName }) : t('supersetExercise', { name: entry.exerciseName })} aria-pressed={inSuperset} style={{ ...iconBtn, color: inSuperset ? 'var(--accent-text)' : 'var(--text-3)', borderColor: inSuperset ? 'var(--accent-line)' : 'var(--line-2)' }}>
               <Icon name="repeat" size={15} />
             </button>
-            <button onClick={() => removeExercise(entry)} aria-label={`Remove ${entry.exerciseName}`} style={iconBtn}>
+            <button onClick={() => removeExercise(entry)} aria-label={t('removeExercise', { name: entry.exerciseName })} style={iconBtn}>
               <Icon name="x" size={16} />
             </button>
           </div>
           <div style={{ borderTop: '1px solid var(--line)' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 52px 44px', gap: 8, padding: '8px var(--pad)', fontSize: 10.5, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-              <span>Set</span><span>{wUnit}</span><span>reps</span><span>RPE</span><span></span>
+              <span>{t('colSet')}</span><span>{wUnit}</span><span>{t('colReps')}</span><span>{t('colRpe')}</span><span></span>
             </div>
             {entry.sets.map((s) => (
               <div key={s.setIndex} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 52px 44px', gap: 8, padding: '6px var(--pad)', alignItems: 'center', borderTop: '1px solid var(--line)', opacity: s.completed ? 0.7 : 1 }}>
                 <Mono style={{ fontSize: 13, color: 'var(--text-3)' }}>{s.setIndex}</Mono>
                 {/* Input shows + accepts the user's unit (lb for IMPERIAL); toKg converts back
                     to canonical kg on commit so storage is always kg. */}
-                <input type="number" inputMode="decimal" aria-label={`weight set ${s.setIndex} (${wUnit})`} defaultValue={weightInputValue(s.weightKg, unitSystem)} onBlur={(e) => commitField(entry, s.setIndex, 'weightKg', e.target.value === '' ? null : toKg(Number(e.target.value), unitSystem))} style={cell} />
-                <input type="number" inputMode="numeric" aria-label={`reps set ${s.setIndex}`} defaultValue={s.reps ?? ''} onBlur={(e) => commitField(entry, s.setIndex, 'reps', e.target.value === '' ? null : Number(e.target.value))} style={cell} />
-                <input type="number" inputMode="decimal" aria-label={`rpe set ${s.setIndex}`} defaultValue={s.rpe ?? ''} onBlur={(e) => commitField(entry, s.setIndex, 'rpe', e.target.value === '' ? null : Number(e.target.value))} style={{ ...cell, fontSize: 12 }} />
-                <button onClick={() => toggleComplete(entry, s.setIndex)} aria-label={`complete set ${s.setIndex}`} aria-pressed={s.completed} style={{ width: 30, height: 30, borderRadius: 'var(--r-xs)', border: `1.6px solid ${s.completed ? 'var(--accent)' : 'var(--line-2)'}`, background: s.completed ? 'var(--accent)' : 'transparent', color: 'var(--on-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', justifySelf: 'center' }}>
+                <input type="number" inputMode="decimal" aria-label={t('ariaWeightSet', { index: s.setIndex, unit: wUnit })} defaultValue={weightInputValue(s.weightKg, unitSystem)} onBlur={(e) => commitField(entry, s.setIndex, 'weightKg', e.target.value === '' ? null : toKg(Number(e.target.value), unitSystem))} style={cell} />
+                <input type="number" inputMode="numeric" aria-label={t('ariaRepsSet', { index: s.setIndex })} defaultValue={s.reps ?? ''} onBlur={(e) => commitField(entry, s.setIndex, 'reps', e.target.value === '' ? null : Number(e.target.value))} style={cell} />
+                <input type="number" inputMode="decimal" aria-label={t('ariaRpeSet', { index: s.setIndex })} defaultValue={s.rpe ?? ''} onBlur={(e) => commitField(entry, s.setIndex, 'rpe', e.target.value === '' ? null : Number(e.target.value))} style={{ ...cell, fontSize: 12 }} />
+                <button onClick={() => toggleComplete(entry, s.setIndex)} aria-label={t('ariaCompleteSet', { index: s.setIndex })} aria-pressed={s.completed} style={{ width: 30, height: 30, borderRadius: 'var(--r-xs)', border: `1.6px solid ${s.completed ? 'var(--accent)' : 'var(--line-2)'}`, background: s.completed ? 'var(--accent)' : 'transparent', color: 'var(--on-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', justifySelf: 'center' }}>
                   {s.completed && <Icon name="check" size={15} stroke={2.6} />}
                 </button>
               </div>
             ))}
             <div style={{ display: 'flex', gap: 10, padding: '10px var(--pad)', borderTop: '1px solid var(--line)' }}>
-              <Btn kind="ghost" size="sm" icon="plus" onClick={() => addSetRow(entry)}>Add set</Btn>
+              <Btn kind="ghost" size="sm" icon="plus" onClick={() => addSetRow(entry)}>{t('addSet')}</Btn>
               {entry.sets.length > 1 && (
-                <Btn kind="ghost" size="sm" onClick={() => removeSetRow(entry, entry.sets.at(-1)!.setIndex)}>Remove set</Btn>
+                <Btn kind="ghost" size="sm" onClick={() => removeSetRow(entry, entry.sets.at(-1)!.setIndex)}>{t('removeSet')}</Btn>
               )}
             </div>
           </div>
@@ -286,17 +288,17 @@ export function ActiveWorkout({ session, unitSystem }: { session: ActiveSessionD
         );
       })}
 
-      <ExercisePicker onAdd={addExercise} label="Add exercise" />
+      <ExercisePicker onAdd={addExercise} label={t('addExerciseLabel')} />
 
       <div style={{ position: 'sticky', bottom: 12, marginTop: 8 }}>
-        <Btn kind="primary" full size="lg" icon="check" onClick={() => setFinishOpen(true)}>Finish workout</Btn>
+        <Btn kind="primary" full size="lg" icon="check" onClick={() => setFinishOpen(true)}>{t('finishWorkout')}</Btn>
       </div>
 
       {finishOpen && (
         <FinishModal
           sessionId={session.id}
           fromRoutine={session.fromRoutine}
-          defaultName={session.name ?? 'New routine'}
+          defaultName={session.name ?? t('newRoutineDefault')}
           durationSec={elapsed}
           onClose={() => setFinishOpen(false)}
         />
@@ -306,22 +308,23 @@ export function ActiveWorkout({ session, unitSystem }: { session: ActiveSessionD
 }
 
 function PlateCalc() {
+  const t = useTranslations('workout');
   const [w, setW] = useState(100);
   const plates = platesPerSide(w);
   return (
     <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-2)' }}>
-        Target
-        <input type="number" value={w} onChange={(e) => setW(Number(e.target.value) || 0)} style={{ ...cell, width: 80 }} />
+        {t('plateTarget')}
+        <input type="number" value={w} onChange={(e) => setW(Number(e.target.value) || 0)} style={{ ...cell, width: 80 }} aria-label={t('plateTarget')} />
         kg
       </label>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {plates.length === 0 ? (
-          <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Bar only / below bar</span>
+          <span style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('plateBarOnly')}</span>
         ) : (
           plates.map((p, i) => <Chip key={i}><Mono>{p}</Mono></Chip>)
         )}
-        <span style={{ fontSize: 12, color: 'var(--text-3)', alignSelf: 'center' }}>per side (20kg bar)</span>
+        <span style={{ fontSize: 12, color: 'var(--text-3)', alignSelf: 'center' }}>{t('platePerSide')}</span>
       </div>
     </div>
   );

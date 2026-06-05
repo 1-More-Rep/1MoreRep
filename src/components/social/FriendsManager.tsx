@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
+import { useTranslations } from 'next-intl';
 import {
   respondFriendAction,
   removeFriendAction,
@@ -71,6 +72,7 @@ export function FriendsManager({
   requests: FriendLite[];
   searchable?: boolean;
 }) {
+  const t = useTranslations('friends');
   const [, start] = useTransition();
   const { toast } = useToast();
   const [query, setQuery] = useState('');
@@ -117,7 +119,7 @@ export function FriendsManager({
         // Optimistic: flip this row to "Requested" instead of clearing the search.
         setRequested((prev) => new Set(prev).add(hit.id));
         setMsg({});
-        toast('Friend request sent.', 'success');
+        toast(t('sent'), 'success');
       }
     });
   }
@@ -128,24 +130,24 @@ export function FriendsManager({
         const { url } = await generateInviteLinkAction();
         await navigator.clipboard.writeText(location.origin + url);
         setCopied(true);
-        toast('Invite link copied to clipboard.', 'success');
+        toast(t('inviteCopied'), 'success');
         setTimeout(() => setCopied(false), 2000);
       } catch {
-        toast('Could not copy invite link.', 'error');
+        toast(t('inviteCopyFailed'), 'error');
       }
     });
   }
 
   function remove(id: string, name: string) {
-    if (!window.confirm(`Remove ${name} from your friends?`)) return;
+    if (!window.confirm(t('confirmRemove', { name }))) return;
     start(async () => {
       await removeFriendAction(id);
-      toast(`Removed ${name}.`, 'info');
+      toast(t('removed', { name }), 'info');
     });
   }
 
   function block(id: string, name: string) {
-    if (!window.confirm(`Block ${name}? They will be removed as a friend and hidden from search.`)) return;
+    if (!window.confirm(t('confirmBlock', { name }))) return;
     start(async () => {
       const r = await blockUserActionResult(id);
       if (r.notice) toast(r.notice, 'info');
@@ -155,23 +157,23 @@ export function FriendsManager({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
       <Card>
-        <SectionLabel style={{ marginBottom: 12 }}>Add a friend</SectionLabel>
+        <SectionLabel style={{ marginBottom: 12 }}>{t('addFriend')}</SectionLabel>
         <Alert kind="error">{msg.error}</Alert>
         <Alert kind="notice">{msg.notice}</Alert>
         <TextField
-          label="Search by name or @handle"
+          label={t('searchLabel')}
           name="handle"
-          placeholder="start typing a name or handle…"
+          placeholder={t('searchPlaceholder')}
           value={query}
           onChange={(e) => setQuery(e.currentTarget.value)}
           autoComplete="off"
         />
         {query.trim().length >= 2 && (
           <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {searching && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Searching…</span>}
+            {searching && <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('searching')}</span>}
             {!searching && results.length === 0 && (
               <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                No matching users. They may need to enable “searchable by handle” in their privacy settings.
+                {t('noMatches')}
               </span>
             )}
             {results.map((u) => {
@@ -199,10 +201,10 @@ export function FriendsManager({
                     {u.publicHandle && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>@{u.publicHandle}</div>}
                   </Link>
                   {isReq ? (
-                    <Chip>Requested</Chip>
+                    <Chip>{t('requested')}</Chip>
                   ) : (
                     <Btn kind="primary" size="sm" icon="plus" onClick={() => add(u)} disabled={requesting === u.id}>
-                      {requesting === u.id ? '…' : 'Add'}
+                      {requesting === u.id ? '…' : t('add')}
                     </Btn>
                   )}
                 </div>
@@ -211,13 +213,13 @@ export function FriendsManager({
           </div>
         )}
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <Btn kind="soft" size="sm" icon="link" onClick={copyInvite}>{copied ? 'Copied!' : 'Copy invite link'}</Btn>
-          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Share a link to connect instantly.</span>
+          <Btn kind="soft" size="sm" icon="link" onClick={copyInvite}>{copied ? t('copied') : t('copyInvite')}</Btn>
+          <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{t('shareHint')}</span>
         </div>
         {!searchable && (
           <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-3)' }}>
-            You’re currently not searchable by handle.{' '}
-            <Link href="/app/settings/privacy" style={{ color: 'var(--accent-text)' }}>Change in privacy settings</Link>.
+            {t('notSearchable')}{' '}
+            <Link href="/app/settings/privacy" style={{ color: 'var(--accent-text)' }}>{t('changeInPrivacy')}</Link>.
           </div>
         )}
       </Card>
@@ -225,7 +227,7 @@ export function FriendsManager({
       {requests.length > 0 && (
         <Card pad={false}>
           <div style={{ padding: 'var(--pad) var(--pad) 0' }}>
-            <SectionLabel>Requests ({requests.length})</SectionLabel>
+            <SectionLabel>{t('requestsCount', { count: requests.length })}</SectionLabel>
           </div>
           {requests.map((r, i) => (
             <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 'var(--row) var(--pad)', borderTop: '1px solid var(--line)', marginTop: i ? 0 : 10 }}>
@@ -234,17 +236,17 @@ export function FriendsManager({
                 <div style={{ fontSize: 14.5, fontWeight: 600 }}>{r.displayName}</div>
                 {r.publicHandle && <div style={{ fontSize: 12, color: 'var(--text-3)' }}>@{r.publicHandle}</div>}
               </Link>
-              <Btn kind="primary" size="sm" onClick={() => start(() => respondFriendAction(r.id, true))}>Accept</Btn>
-              <Btn kind="ghost" size="sm" onClick={() => start(() => respondFriendAction(r.id, false))}>Decline</Btn>
+              <Btn kind="primary" size="sm" onClick={() => start(() => respondFriendAction(r.id, true))}>{t('accept')}</Btn>
+              <Btn kind="ghost" size="sm" onClick={() => start(() => respondFriendAction(r.id, false))}>{t('decline')}</Btn>
             </div>
           ))}
         </Card>
       )}
 
-      <SectionLabel>Friends ({friends.length})</SectionLabel>
+      <SectionLabel>{t('friendsCount', { count: friends.length })}</SectionLabel>
       {friends.length === 0 && (
         <Card soft>
-          <span style={{ color: 'var(--text-3)' }}>No friends yet — search by name above or share your invite link.</span>
+          <span style={{ color: 'var(--text-3)' }}>{t('none')}</span>
         </Card>
       )}
       {friends.map((f) => (
@@ -257,8 +259,8 @@ export function FriendsManager({
           {f.streak ? (
             <Chip accent><Icon name="flame" size={13} stroke={2} /><Mono>{f.streak}</Mono></Chip>
           ) : null}
-          <Btn kind="ghost" size="sm" onClick={() => remove(f.id, f.displayName)}>Remove</Btn>
-          <Btn kind="ghost" size="sm" onClick={() => block(f.id, f.displayName)} style={{ color: 'var(--text-3)' }}>Block</Btn>
+          <Btn kind="ghost" size="sm" onClick={() => remove(f.id, f.displayName)}>{t('remove')}</Btn>
+          <Btn kind="ghost" size="sm" onClick={() => block(f.id, f.displayName)} style={{ color: 'var(--text-3)' }}>{t('block')}</Btn>
         </Card>
       ))}
     </div>

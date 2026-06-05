@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import type { CSSProperties, ReactNode } from 'react';
 import { Icon } from './Icon';
 
@@ -34,6 +35,7 @@ export function Sheet({
   maxWidth = 440,
   ariaLabel,
 }: SheetProps) {
+  const t = useTranslations('ui');
   const sheetRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -138,7 +140,7 @@ export function Sheet({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t('close')}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
