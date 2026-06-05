@@ -2,26 +2,25 @@
 
 import { useState } from 'react';
 import type { Muscle } from '@/domain/muscles/taxonomy';
-import { MUSCLE_LABEL } from '@/domain/muscles/taxonomy';
-import { fatigueToTint } from '@/domain/fatigue/model';
-import { Btn } from '@/components/ui/Btn';
+import { Segmented } from '@/components/ui/Segmented';
 
 type View = 'front' | 'back';
 
-function fill(f: number | undefined): string {
-  const { cssVar, alpha } = fatigueToTint(f ?? 0);
-  return `color-mix(in oklab, var(${cssVar}) ${Math.round(alpha * 100)}%, var(--surface-2))`;
-}
-
+/**
+ * 2D body silhouette with clickable muscle regions. Mode-agnostic: the caller
+ * supplies `tint(muscle)` (region fill) and `regionLabel(muscle)` (aria-label),
+ * so the same SVG drives both the fatigue and strength views.
+ */
 export function BodyMap({
-  fatigue,
-  etaHours,
+  tint,
+  regionLabel,
+  title,
   onSelect,
   selected,
 }: {
-  fatigue: Partial<Record<Muscle, number>>;
-  /** Optional per-muscle recovery ETA (hours) — appended to the region aria-label. */
-  etaHours?: Partial<Record<Muscle, number>>;
+  tint: (m: Muscle) => string;
+  regionLabel: (m: Muscle) => string;
+  title: string;
   onSelect?: (m: Muscle) => void;
   selected?: Muscle | null;
 }) {
@@ -29,14 +28,12 @@ export function BodyMap({
 
   function Region({ muscle, children }: { muscle: Muscle; children: React.ReactNode }) {
     const isSel = selected === muscle;
-    const eta = etaHours?.[muscle];
-    const label = `${MUSCLE_LABEL[muscle]}, ${Math.round((fatigue[muscle] ?? 0) * 100)}% fatigued${eta != null && eta > 0 ? `, recovers ~${Math.round(eta)}h` : ''}`;
     return (
       <g
         role="button"
         tabIndex={0}
         className="bodymap-region"
-        aria-label={label}
+        aria-label={regionLabel(muscle)}
         aria-pressed={isSel}
         onClick={() => onSelect?.(muscle)}
         onKeyDown={(e) => {
@@ -45,7 +42,7 @@ export function BodyMap({
             onSelect?.(muscle);
           }
         }}
-        style={{ cursor: onSelect ? 'pointer' : 'default', fill: fill(fatigue[muscle]), stroke: isSel ? 'var(--accent)' : 'var(--line-2)', strokeWidth: isSel ? 1.6 : 0.7, transition: 'fill .3s' }}
+        style={{ cursor: onSelect ? 'pointer' : 'default', fill: tint(muscle), stroke: isSel ? 'var(--accent)' : 'var(--line-2)', strokeWidth: isSel ? 1.6 : 0.7, transition: 'fill .3s' }}
       >
         {children}
       </g>
@@ -57,12 +54,19 @@ export function BodyMap({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <Btn kind={view === 'front' ? 'primary' : 'soft'} size="sm" onClick={() => setView('front')}>Front</Btn>
-        <Btn kind={view === 'back' ? 'primary' : 'soft'} size="sm" onClick={() => setView('back')}>Back</Btn>
-      </div>
+      <Segmented<View>
+        ariaLabel="Body view"
+        size="sm"
+        value={view}
+        onChange={setView}
+        options={[
+          { value: 'front', label: 'Front' },
+          { value: 'back', label: 'Back' },
+        ]}
+        style={{ width: 180 }}
+      />
 
-      <svg role="img" viewBox="0 0 120 250" width="100%" style={{ maxWidth: 280, display: 'block' }} aria-label={`Muscle fatigue, ${view} view`}>
+      <svg role="img" viewBox="0 0 120 250" width="100%" style={{ maxWidth: 280, display: 'block' }} aria-label={`${title}, ${view} view`}>
         {/* silhouette (non-interactive so muscle regions own the clicks) */}
         <g className="bodymap-silhouette" style={{ fill: 'var(--surface)', stroke: 'var(--line)', strokeWidth: 1 }}>
           <ellipse cx="60" cy="22" rx="13" ry="15" /> {/* head */}

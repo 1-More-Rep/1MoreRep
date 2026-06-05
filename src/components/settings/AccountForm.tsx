@@ -1,12 +1,12 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import type { UnitSystem } from '@prisma/client';
+import type { Sex, UnitSystem } from '@prisma/client';
 import { updateAccountAction, requestEmailChangeAction, type AccountState } from '@/server/actions/account';
 import { Card, Btn, SectionLabel } from '@/components/ui';
 import { Alert, TextField } from '@/components/auth/ui';
 
-export function AccountForm({ displayName, unitSystem, timezone, email }: { displayName: string; unitSystem: UnitSystem; timezone: string; email: string }) {
+export function AccountForm({ displayName, unitSystem, timezone, email, sex }: { displayName: string; unitSystem: UnitSystem; timezone: string; email: string; sex: Sex }) {
   const [state, action] = useActionState(updateAccountAction, {} as AccountState);
   const [emailState, emailAction] = useActionState(requestEmailChangeAction, {} as AccountState);
   const [tz, setTz] = useState(timezone);
@@ -25,6 +25,15 @@ export function AccountForm({ displayName, unitSystem, timezone, email }: { disp
               <option value="METRIC">Metric (kg, cm)</option>
               <option value="IMPERIAL">Imperial (lb, in)</option>
             </select>
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-2)' }}>Sex (optional)</span>
+            <select name="sex" defaultValue={sex} style={sel}>
+              <option value="UNSPECIFIED">Prefer not to say</option>
+              <option value="FEMALE">Female</option>
+              <option value="MALE">Male</option>
+            </select>
+            <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Used only to calibrate per-muscle strength standards.</span>
           </label>
           <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
             <div style={{ flex: 1 }}>

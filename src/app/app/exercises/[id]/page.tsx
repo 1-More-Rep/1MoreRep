@@ -23,7 +23,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
   const links = [...ex.muscleLinks].sort((a, b) => b.weight - a.weight);
   const history = await getExerciseSetHistory(id, user.id);
   const trend: ChartPoint[] = history.map((p) => ({ label: short(p.at), value: p.est1RM }));
-  const fatigue = Object.fromEntries(ex.muscleLinks.map((m) => [m.muscle, m.weight])) as Partial<Record<Muscle, number>>;
+  const involvement = Object.fromEntries(ex.muscleLinks.map((m) => [m.muscle, m.weight])) as Partial<Record<Muscle, number>>;
   const lowConfidence = history.some((p) => p.lowConfidence);
 
   return (
@@ -78,7 +78,18 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
 
       <Card>
         <SectionLabel style={{ marginBottom: 14 }}>Muscle map</SectionLabel>
-        <BodyMap fatigue={fatigue} />
+        <BodyMap
+          title="Muscles worked"
+          tint={(m) => {
+            const w = involvement[m] ?? 0;
+            return w > 0
+              ? `color-mix(in oklab, var(--accent) ${Math.round(Math.min(1, w) * 78 + 14)}%, var(--surface-2))`
+              : 'var(--surface-2)';
+          }}
+          regionLabel={(m) =>
+            involvement[m] ? `${MUSCLE_LABEL[m]}, ${Math.round(involvement[m]! * 100)}% involvement` : MUSCLE_LABEL[m]
+          }
+        />
       </Card>
 
       <Card>

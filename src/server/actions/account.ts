@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import type { UnitSystem } from '@prisma/client';
+import type { Sex, UnitSystem } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { requireUser } from '@/lib/auth/guards';
 import { issueToken } from '@/lib/auth/tokens';
@@ -23,9 +23,16 @@ export async function updateAccountAction(_prev: AccountState, formData: FormDat
   } catch {
     timezone = 'UTC';
   }
+  const sexRaw = String(formData.get('sex') ?? 'UNSPECIFIED');
+  const sex: Sex = sexRaw === 'FEMALE' || sexRaw === 'MALE' ? sexRaw : 'UNSPECIFIED';
   await prisma.user.update({
     where: { id: user.id },
-    data: { displayName, unitSystem: (String(formData.get('unitSystem')) as UnitSystem) === 'IMPERIAL' ? 'IMPERIAL' : 'METRIC', timezone },
+    data: {
+      displayName,
+      unitSystem: (String(formData.get('unitSystem')) as UnitSystem) === 'IMPERIAL' ? 'IMPERIAL' : 'METRIC',
+      timezone,
+      sex,
+    },
   });
   revalidatePath('/app/settings/account');
   return { notice: 'Account updated.' };

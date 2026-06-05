@@ -123,10 +123,12 @@ export function computeFatigue(
 
 /**
  * Map a fatigue value (0..1) to the body-map heat tint: an accent CSS variable
- * mixed over the surface by `alpha` (0..1). Fresh muscles (<12%) read as no tint.
+ * mixed over the surface by `alpha` (0..1). Fresh muscles keep a faint floor tint
+ * so a recovered body still reads as intentionally "all fresh" rather than empty.
  * Single source of truth for the threshold mapping (consumed by BodyMap).
  */
 export function fatigueToTint(fatigue: number): { cssVar: string; alpha: number } {
   const v = clamp01(fatigue);
-  return { cssVar: '--accent', alpha: v < 0.12 ? 0 : v };
+  // Below ~12% snap to a subtle baseline tint; above it, alpha tracks fatigue.
+  return { cssVar: '--accent', alpha: v < 0.12 ? 0.06 : v };
 }

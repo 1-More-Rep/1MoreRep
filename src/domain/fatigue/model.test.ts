@@ -83,10 +83,10 @@ describe('recoveryEtaHours', () => {
 });
 
 describe('fatigueToTint (W5-T6)', () => {
-  it('reads fresh muscles as no tint, ramps accent with fatigue', () => {
-    expect(fatigueToTint(0.05)).toEqual({ cssVar: '--accent', alpha: 0 }); // below the 12% floor
+  it('gives fresh muscles a faint floor tint, ramps accent with fatigue', () => {
+    expect(fatigueToTint(0.05)).toEqual({ cssVar: '--accent', alpha: 0.06 }); // below 12% → faint baseline
     expect(fatigueToTint(0.6)).toEqual({ cssVar: '--accent', alpha: 0.6 });
     expect(fatigueToTint(1.5).alpha).toBe(1); // clamped
-    expect(fatigueToTint(-0.3).alpha).toBe(0); // clamped
+    expect(fatigueToTint(-0.3).alpha).toBe(0.06); // clamped to 0 → floor tint
   });
 });
