@@ -3,12 +3,15 @@ import { notFound } from 'next/navigation';
 import { requireUser } from '@/lib/auth/guards';
 import { getRoutine } from '@/server/queries/routines';
 import { startWorkoutAction } from '@/server/actions/workout';
-import { deleteRoutineAction } from '@/server/actions/routines';
 import { Btn } from '@/components/ui/Btn';
-import { Chip } from '@/components/ui/Chip';
+import { Card } from '@/components/ui/Card';
 import { RoutineEditor } from '@/components/workout/RoutineEditor';
+import { RoutineHeaderEditor } from '@/components/workout/RoutineHeaderEditor';
+import { ArchiveRoutineButton } from '@/components/workout/ArchiveRoutineButton';
 
 export const dynamic = 'force-dynamic';
+
+type GoalValue = '' | 'HYPERTROPHY' | 'STRENGTH' | 'ENDURANCE' | 'GENERAL';
 
 export default async function RoutineEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -18,15 +21,21 @@ export default async function RoutineEditorPage({ params }: { params: Promise<{ 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
-      <Link href="/app/workouts" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← Workouts</Link>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0, flex: '1 1 auto' }}>{routine.name}</h1>
-        {routine.goal && <Chip accent>{routine.goal.toLowerCase()}</Chip>}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <Link href="/app/workouts" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← Workouts</Link>
         <form action={startWorkoutAction.bind(null, routine.id)}>
           <Btn type="submit" icon="play">Start workout</Btn>
         </form>
       </div>
+
+      <Card>
+        <RoutineHeaderEditor
+          routineId={routine.id}
+          name={routine.name}
+          goal={(routine.goal ?? '') as GoalValue}
+          notes={routine.notes ?? ''}
+        />
+      </Card>
 
       <RoutineEditor
         routineId={routine.id}
@@ -41,9 +50,9 @@ export default async function RoutineEditorPage({ params }: { params: Promise<{ 
         }))}
       />
 
-      <form action={deleteRoutineAction.bind(null, routine.id)} style={{ marginTop: 20 }}>
-        <Btn type="submit" kind="ghost" size="sm" icon="x">Delete routine</Btn>
-      </form>
+      <div style={{ marginTop: 20 }}>
+        <ArchiveRoutineButton routineId={routine.id} name={routine.name} />
+      </div>
     </div>
   );
 }

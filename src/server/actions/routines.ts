@@ -30,6 +30,71 @@ export async function createRoutineAction(_prev: RoutineState, formData: FormDat
   redirect(`/app/workouts/${routine.id}`);
 }
 
+// Strict update of a routine's own metadata. `.strict()` blocks mass-assignment of
+// other Routine columns (ownerId, isArchived, …); every field is optional so callers
+// can patch just one. An empty-string goal clears it.
+const routineUpdateSchema = z
+  .object({
+    name: z.string().trim().min(2).max(60).optional(),
+    goal: z.enum(['HYPERTROPHY', 'STRENGTH', 'ENDURANCE', 'GENERAL', '']).nullable().optional(),
+    notes: z.string().trim().max(2000).optional(),
+  })
+  .strict();
+
+export async function updateRoutineAction(
+  routineId: string,
+  data: { name?: string; goal?: Goal | '' | null; notes?: string },
+): Promise<RoutineState> {
+  const user = await requireUser();
+  await ownRoutine(routineId, user.id);
+  const parsed = routineUpdateSchema.safeParse(data);
+  if (!parsed.success) return { error: 'Invalid routine details.' };
+  const patch: { name?: string; goal?: Goal | null; notes?: string | null } = {};
+  if (parsed.data.name !== undefined) patch.name = parsed.data.name;
+  if (parsed.data.goal !== undefined) patch.goal = (parsed.data.goal || null) as Goal | null;
+  if (parsed.data.notes !== undefined) patch.notes = parsed.data.notes || null;
+  await prisma.routine.update({ where: { id: routineId }, data: patch });
+  revalidatePath(`/app/workouts/${routineId}`);
+  revalidatePath('/app/workouts');
+  return {};
+}
+
+/** Clone a routine (with all its items) into a new editable routine. */
+export async function duplicateRoutineAction(routineId: string): Promise<void> {
+  const user = await requireUser();
+  const src = await ownRoutine(routineId, user.id);
+  const items = await prisma.routineItem.findMany({ where: { routineId }, orderBy: { order: 'asc' } });
+  const copy = await prisma.routine.create({
+    data: {
+      ownerId: user.id,
+      name: `${src.name} (copy)`.slice(0, 60),
+      goal: src.goal,
+      notes: src.notes,
+      items: {
+        create: items.map((it) => ({
+          exerciseId: it.exerciseId,
+          order: it.order,
+          supersetGroup: it.supersetGroup,
+          targetSets: it.targetSets,
+          targetRepLow: it.targetRepLow,
+          targetRepHigh: it.targetRepHigh,
+          targetRestSec: it.targetRestSec,
+          targetRpe: it.targetRpe,
+          notes: it.notes,
+        })),
+      },
+    },
+  });
+  redirect(`/app/workouts/${copy.id}`);
+}
+
+export async function setRoutineArchivedAction(routineId: string, archived: boolean): Promise<void> {
+  const user = await requireUser();
+  await ownRoutine(routineId, user.id);
+  await prisma.routine.update({ where: { id: routineId }, data: { isArchived: archived } });
+  revalidatePath('/app/workouts');
+}
+
 export async function addRoutineItemAction(routineId: string, exerciseId: string): Promise<void> {
   const user = await requireUser();
   await ownRoutine(routineId, user.id);
@@ -102,11 +167,4 @@ export async function removeRoutineItemAction(itemId: string): Promise<void> {
   if (!item || item.routine.ownerId !== user.id) throw new AuthorizationError();
   await prisma.routineItem.delete({ where: { id: itemId } });
   revalidatePath(`/app/workouts/${item.routineId}`);
-}
-
-export async function deleteRoutineAction(routineId: string): Promise<void> {
-  const user = await requireUser();
-  await ownRoutine(routineId, user.id);
-  await prisma.routine.update({ where: { id: routineId }, data: { isArchived: true } });
-  redirect('/app/workouts');
 }

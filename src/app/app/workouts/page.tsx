@@ -1,18 +1,19 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth/guards';
-import { listRoutines } from '@/server/queries/routines';
+import { listRoutines, listArchivedRoutines } from '@/server/queries/routines';
 import { startWorkoutAction } from '@/server/actions/workout';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
 import { Btn } from '@/components/ui/Btn';
-import { Mono, SectionLabel } from '@/components/ui/typography';
+import { Icon, Mono, SectionLabel } from '@/components/ui';
 import { CreateRoutineForm } from '@/components/workout/CreateRoutineForm';
+import { RoutineCardMenu } from '@/components/workout/RoutineCardMenu';
 
 export const dynamic = 'force-dynamic';
 
 export default async function WorkoutsPage() {
   const user = await requireUser();
-  const routines = await listRoutines(user.id);
+  const [routines, archived] = await Promise.all([listRoutines(user.id), listArchivedRoutines(user.id)]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
@@ -31,13 +32,13 @@ export default async function WorkoutsPage() {
       </div>
 
       {routines.length === 0 && (
-        <Card soft><span style={{ color: 'var(--text-3)' }}>No routines yet. Create one above.</span></Card>
+        <Card soft><span style={{ color: 'var(--text-3)' }}>No routines yet. Create one above, or start an empty workout.</span></Card>
       )}
 
       {routines.map((r) => (
         <Card key={r.id}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 200px' }}>
+            <div style={{ flex: '1 1 200px', minWidth: 0 }}>
               <Link href={`/app/workouts/${r.id}`} style={{ fontSize: 17, fontWeight: 700, textDecoration: 'none', color: 'var(--text)' }}>
                 {r.name}
               </Link>
@@ -49,12 +50,21 @@ export default async function WorkoutsPage() {
             <Chip><Mono>{r._count.items}</Mono>&nbsp;exercises</Chip>
             {r.goal && <Chip accent>{r.goal.toLowerCase()}</Chip>}
             <div style={{ display: 'flex', gap: 8 }}>
-              <Link href={`/app/workouts/${r.id}`} style={{ textDecoration: 'none' }}><Btn kind="ghost" size="sm" icon="edit">Edit</Btn></Link>
               <form action={startWorkoutAction.bind(null, r.id)}><Btn type="submit" size="sm" icon="play">Start</Btn></form>
+              <RoutineCardMenu routineId={r.id} name={r.name} />
             </div>
           </div>
         </Card>
       ))}
+
+      {archived.length > 0 && (
+        <Link
+          href="/app/workouts/archived"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}
+        >
+          <Icon name="history" size={15} stroke={1.8} /> Archived routines ({archived.length})
+        </Link>
+      )}
     </div>
   );
 }

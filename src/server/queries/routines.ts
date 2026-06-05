@@ -9,6 +9,14 @@ export async function listRoutines(userId: string) {
   });
 }
 
+export async function listArchivedRoutines(userId: string) {
+  return prisma.routine.findMany({
+    where: { ownerId: userId, isArchived: true },
+    orderBy: { updatedAt: 'desc' },
+    include: { _count: { select: { items: true } } },
+  });
+}
+
 export async function getRoutine(id: string, userId: string) {
   const r = await prisma.routine.findUnique({
     where: { id },
