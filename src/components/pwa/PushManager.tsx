@@ -1,22 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { subscribePushAction, sendTestPushAction, unsubscribePushAction } from '@/server/actions/push';
+import { sendTestPushAction, unsubscribePushAction } from '@/server/actions/push';
 import { detectPushCapability, type PushCapability } from '@/lib/pwa/ios';
+import { requestAndSubscribe } from '@/lib/pwa/pushClient';
 import { Btn } from '@/components/ui/Btn';
 import { Chip } from '@/components/ui/Chip';
 import { SectionLabel } from '@/components/ui/typography';
 import { InstallGuide } from './InstallGuide';
-
-function urlBase64ToBuffer(base64: string): ArrayBuffer {
-  const padding = '='.repeat((4 - (base64.length % 4)) % 4);
-  const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const raw = atob(b64);
-  const buffer = new ArrayBuffer(raw.length);
-  const arr = new Uint8Array(buffer);
-  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
-  return buffer;
-}
 
 export function PushManager({ vapidPublicKey }: { vapidPublicKey: string | null }) {
   const [cap, setCap] = useState<PushCapability | null>(null);
@@ -37,23 +28,16 @@ export function PushManager({ vapidPublicKey }: { vapidPublicKey: string | null 
     if (!vapidPublicKey) return;
     setBusy(true);
     setMsg(null);
-    try {
-      const perm = await Notification.requestPermission();
-      if (perm !== 'granted') {
-        setMsg('Notifications were not allowed.');
-        return;
-      }
-      const reg = await navigator.serviceWorker.ready;
-      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToBuffer(vapidPublicKey) });
-      const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } };
-      await subscribePushAction({ endpoint: json.endpoint, keys: json.keys });
+    const res = await requestAndSubscribe(vapidPublicKey);
+    if (res === 'granted') {
       setSubscribed(true);
       setMsg('Notifications enabled.');
-    } catch {
+    } else if (res === 'denied') {
+      setMsg('Notifications were not allowed.');
+    } else {
       setMsg('Could not enable notifications.');
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   }
 
   async function test() {
