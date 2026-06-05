@@ -10,6 +10,7 @@ blob-report
 .env*.local
 data
 design
+homepage
 **/*.md
 !README.md
 Dockerfile

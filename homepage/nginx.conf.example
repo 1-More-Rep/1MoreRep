@@ -1,0 +1,60 @@
+# 1MoreRep marketing homepage — static hosting for 1morerep.de.
+# Frontend only: just serve this folder. Copy it to the server (e.g. /var/www/1morerep),
+# drop in your TLS cert, and reload nginx. The app itself lives separately at
+# app.1morerep.de (see ../deploy/nginx.conf.example for that reverse-proxy block).
+
+# Redirect http -> https
+server {
+    listen 80;
+    listen [::]:80;
+    server_name 1morerep.de www.1morerep.de;
+    return 308 https://1morerep.de$request_uri;
+}
+
+# Optional: send www -> apex over https
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name www.1morerep.de;
+    ssl_certificate     /etc/letsencrypt/live/1morerep.de/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/1morerep.de/privkey.pem;
+    return 308 https://1morerep.de$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name 1morerep.de;
+
+    # Your Let's Encrypt cert (same as you use for app.1morerep.de, or a separate one)
+    ssl_certificate     /etc/letsencrypt/live/1morerep.de/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/1morerep.de/privkey.pem;
+
+    # Path to the contents of this homepage/ folder on the server
+    root /var/www/1morerep;
+    index index.html;
+
+    # Static site: serve the file or fall back to index.html
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Long-cache fingerprint-free assets modestly; tune to taste.
+    location ~* \.(?:css|js|svg|png|jpg|jpeg|webp|ico|woff2?)$ {
+        expires 7d;
+        add_header Cache-Control "public";
+        try_files $uri =404;
+    }
+
+    # Never cache the HTML shell so updates show up immediately
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json image/svg+xml application/xml;
+}

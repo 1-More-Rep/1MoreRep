@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>1MoreRep — Self-hosted workout tracker with streaks, leagues & a smart generator</title>
+  <meta name="description" content="1MoreRep is a self-hosted, multi-user gym tracker PWA: log workouts, follow or auto-generate routines, track progress, and climb the leagues. Your data, your server, no subscriptions." />
+  <meta name="theme-color" content="#e2553a" />
+  <!-- Progressive enhancement: only hide reveal elements when JS can un-hide them. -->
+  <script>document.documentElement.classList.add('js');</script>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="canonical" href="https://1morerep.de/" />
+
+  <!-- Open Graph / Twitter -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="1MoreRep — Self-hosted workout tracker" />
+  <meta property="og:description" content="Log workouts, auto-generate routines, track progress, and climb the leagues — all on your own server." />
+  <meta property="og:url" content="https://1morerep.de/" />
+  <meta property="og:image" content="https://1morerep.de/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="preload" href="styles.css" as="style" />
+  <link rel="stylesheet" href="styles.css" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "1MoreRep",
+    "applicationCategory": "HealthApplication",
+    "operatingSystem": "Web, Android, iOS (PWA)",
+    "description": "Self-hosted, multi-user gym/fitness tracker PWA with workout logging, an exercise library, a muscle-fatigue model, an algorithmic + LLM-assisted workout generator, body metrics, and a social layer (XP, leagues, streaks, leaderboards).",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- ===================== Header ===================== -->
+  <header class="header" id="top">
+    <div class="wrap nav">
+      <a class="brand" href="#top" aria-label="1MoreRep home">
+        <img class="mark" src="favicon.svg" width="34" height="34" alt="" />
+        <span><b>1More</b><span>Rep</span></span>
+      </a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#generator">Generator</a>
+        <a href="#selfhost">Self-host</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div class="nav-cta">
+        <a class="signin" href="https://app.1morerep.de/login">Sign in</a>
+        <a class="btn" href="https://app.1morerep.de">Open app
+          <svg class="arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <button class="menu-btn" id="menuBtn" aria-label="Menu" aria-expanded="false">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#generator">Generator</a>
+      <a href="#selfhost">Self-host</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://app.1morerep.de/login">Sign in</a>
+    </div>
+  </header>
+
+  <!-- ===================== Hero ===================== -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <span class="eyebrow"><span class="dot"></span> Self-hosted · Open · Yours</span>
+        <h1>Train harder.<br>Track everything.<br><span class="hl">Own your data.</span></h1>
+        <p class="hero-sub">1MoreRep is a self-hosted gym tracker that turns lifting into a game — log workouts, auto-generate routines, watch your progress, and climb the weekly leagues with friends.</p>
+        <div class="hero-cta">
+          <a class="btn btn-lg" href="https://app.1morerep.de">Open the app
+            <svg class="arr" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn btn-ghost btn-lg" href="#features">Explore features</a>
+        </div>
+        <div class="hero-trust">
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> No subscriptions</span>
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Runs on your server</span>
+          <span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> Installs as an app</span>
+        </div>
+      </div>
+
+      <!-- Phone mockup -->
+      <div class="hero-visual">
+        <div class="phone reveal">
+          <div class="screen">
+            <div class="screen-top">
+              <div class="s-row">
+                <div>
+                  <div class="s-title">Push Day</div>
+                  <div class="s-sub">Week 3 · Upper / Lower split</div>
+                </div>
+                <div class="flame">🔥 12</div>
+              </div>
+            </div>
+            <div class="screen-body">
+              <div class="ex-card">
+                <h4>Bench Press <span class="pr">New PR</span></h4>
+                <div class="set done"><span class="n">1</span><span class="v"><b>60</b> kg × <b>8</b></span><span class="tick"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+                <div class="set done"><span class="n">2</span><span class="v"><b>60</b> kg × <b>8</b></span><span class="tick"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+                <div class="set active"><span class="n">3</span><span class="v"><b>62.5</b> kg × <b>7</b></span><span class="tick">›</span></div>
+              </div>
+              <div class="rest"><span class="pulse"></span> Rest · 1:30 remaining</div>
+              <div class="ex-card">
+                <h4>Overhead Press</h4>
+                <div class="set"><span class="n">1</span><span class="v"><b>35</b> kg × <b>10</b></span><span class="tick"></span></div>
+                <div class="set"><span class="n">2</span><span class="v"><b>35</b> kg × <b>10</b></span><span class="tick"></span></div>
+              </div>
+              <div class="xp">
+                <div class="xp-row"><span class="lvl">★ Level 7</span><span>+120 XP today</span></div>
+                <div class="xp-bar" id="xpBar"><i></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="float float-a">
+          <span class="ic" style="background:#e8f2ea;color:#4f9d69">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v5h-5"/></svg>
+          </span>
+          <div>+8% volume<small>vs. last week</small></div>
+        </div>
+        <div class="float float-b">
+          <span class="ic" style="background:#fdeee6;color:#cf4528">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z"/></svg>
+          </span>
+          <div>League: Gold<small>Rank 2 of 30</small></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Stat band ===================== -->
+  <div class="band">
+    <div class="wrap">
+      <div class="stat reveal"><b>873<span class="u">+</span></b><span>Exercises built in</span></div>
+      <div class="stat reveal d1"><b>2D</b><span>Muscle-fatigue map</span></div>
+      <div class="stat reveal d2"><b>XP &amp; <span class="u">Leagues</span></b><span>Weekly competition</span></div>
+      <div class="stat reveal d3"><b>100%</b><span>Self-hosted &amp; private</span></div>
+    </div>
+  </div>
+
+  <!-- ===================== Features ===================== -->
+  <section class="section" id="features">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow"><span class="dot"></span> Everything in one place</span>
+        <h2 style="margin-top:16px">A complete training companion</h2>
+        <p>From your first set to your weekly leaderboard standing — every part of training, thoughtfully built and tied together.</p>
+      </div>
+      <div class="features-grid">
+        <div class="card reveal">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11"/><path d="M3 8l-1 1 2 2"/><path d="M8 3 7 4l2 2"/><path d="M21 16l-1 1-2-2"/><path d="M16 21l1-1-2-2"/><rect x="4.5" y="4.5" width="5" height="5" rx="1.2" transform="rotate(45 7 7)"/><rect x="14.5" y="14.5" width="5" height="5" rx="1.2" transform="rotate(45 17 17)"/></svg></div>
+          <h3>Fast workout logging</h3>
+          <p>Tap through sets, reps and weight with built-in rest timers. Auto-detected PRs keep every session honest.</p>
+        </div>
+        <div class="card reveal d1">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16M4 12h16M4 19h10"/><circle cx="19" cy="19" r="2.4"/></svg></div>
+          <h3>873-exercise library</h3>
+          <p>A curated catalogue with mechanics, equipment and worked muscles — or add your own movements.</p>
+        </div>
+        <div class="card reveal d2">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.6"/><path d="M12 8v7M12 11l-5 2M12 11l5 2M9 22l3-5 3 5"/></svg></div>
+          <h3>2D muscle-fatigue map</h3>
+          <p>See which muscles you've hit — and which need work — on an interactive body map driven by a real fatigue model.</p>
+        </div>
+        <div class="card reveal">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4"/><circle cx="12" cy="12" r="3.4"/></svg></div>
+          <h3>Smart routine generator</h3>
+          <p>An algorithmic generator builds balanced programs — and optionally taps a self-hosted LLM to tailor them to you.</p>
+        </div>
+        <div class="card reveal d1">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="M7 16l3-4 3 2 4-7"/></svg></div>
+          <h3>Progress &amp; body metrics</h3>
+          <p>Track weight, measurements and progress photos over time, with charts that make momentum visible.</p>
+        </div>
+        <div class="card reveal d2">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z"/></svg></div>
+          <h3>Streaks, XP &amp; levels</h3>
+          <p>Every workout earns XP and feeds your streak. A Duolingo-style loop that keeps you showing up.</p>
+        </div>
+        <div class="card reveal">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V7a6 6 0 0 1 12 0v2"/><path d="M5 9h14l-1 7a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4L5 9Z"/><path d="M9 13h6"/></svg></div>
+          <h3>Weekly leagues &amp; friends</h3>
+          <p>Get promoted (or relegated) each week, compare with friends, and top your instance's leaderboard.</p>
+        </div>
+        <div class="card reveal d1">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9Z"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+          <h3>Web-push reminders</h3>
+          <p>Opt-in nudges when your streak is at risk — delivered straight to your phone, no app store required.</p>
+        </div>
+        <div class="card reveal d2">
+          <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M11 18.5h2"/></svg></div>
+          <h3>Installable PWA</h3>
+          <p>Add it to your home screen for a full-screen, app-like experience that works great offline.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== How it works ===================== -->
+  <section class="section" id="how" style="background:var(--paper-2);border-block:1px solid var(--line)">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow"><span class="dot"></span> Up and running in minutes</span>
+        <h2 style="margin-top:16px">Three steps to your first session</h2>
+      </div>
+      <div class="steps">
+        <div class="step reveal">
+          <div class="num">1</div>
+          <h3>Create your account</h3>
+          <p>Sign in to your instance and set your units, goals and experience in a quick onboarding.</p>
+        </div>
+        <div class="step reveal d1">
+          <div class="num">2</div>
+          <h3>Build or generate a routine</h3>
+          <p>Pick from the library, craft your own split, or let the generator design a balanced program for you.</p>
+        </div>
+        <div class="step reveal d2">
+          <div class="num">3</div>
+          <h3>Train, track &amp; climb</h3>
+          <p>Log every set, watch your fatigue map and charts update, and rise through the weekly leagues.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Generator highlight ===================== -->
+  <section class="section" id="generator">
+    <div class="wrap split">
+      <div class="split-copy reveal">
+        <span class="eyebrow"><span class="dot"></span> The generator</span>
+        <h2>Programs that build themselves</h2>
+        <p class="lead">Tell it your split, days per week and focus. The deterministic generator assembles a balanced, progressive program — and when you connect a self-hosted Ollama model, it tailors the details to your history and preferences.</p>
+        <ul class="checks">
+          <li><span class="cb"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Balanced volume across muscle groups, automatically.</li>
+          <li><span class="cb"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Adapts difficulty as you progress, session to session.</li>
+          <li><span class="cb"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Optional LLM stays on <em>your</em> server — nothing sent to the cloud.</li>
+        </ul>
+        <div class="hero-cta" style="margin-top:28px">
+          <a class="btn" href="https://app.1morerep.de">Try the generator
+            <svg class="arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </div>
+      </div>
+      <div class="split-media reveal d1">
+        <div class="media-card gen">
+          <div class="g-prompt">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/><circle cx="12" cy="12" r="3.4"/></svg>
+            <span>Upper / Lower · 4 days · strength focus</span>
+            <span class="k">Generate</span>
+          </div>
+          <div class="g-out">
+            <div class="g-day"><span class="tag">Mon</span><div><b>Upper A</b> &nbsp;<span>Bench · Row · OHP · Pull-down</span></div></div>
+            <div class="g-day"><span class="tag">Tue</span><div><b>Lower A</b> &nbsp;<span>Squat · RDL · Leg curl · Calf</span></div></div>
+            <div class="g-day"><span class="tag">Thu</span><div><b>Upper B</b> &nbsp;<span>Incline · Pull-up · Lateral · Curl</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Gamification (dark) ===================== -->
+  <section class="section dark">
+    <div class="wrap split rev">
+      <div class="split-media reveal">
+        <div class="league">
+          <h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V7a6 6 0 0 1 12 0v2"/><path d="M5 9h14l-1 7a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4L5 9Z"/></svg> Gold League · 3 days left</h4>
+          <div class="sub">Top 7 get promoted on Sunday night</div>
+          <div class="rank gold"><span class="pos">1</span><span class="who">Sofia K. <small>Push / Pull / Legs</small></span><span class="pts">2,410</span></div>
+          <div class="rank me"><span class="pos">2</span><span class="who">You <small>Upper / Lower · 🔥 12-day streak</small></span><span class="pts">2,180</span></div>
+          <div class="rank"><span class="pos">3</span><span class="who">Marc D. <small>Full body</small></span><span class="pts">1,990</span></div>
+          <div class="rank"><span class="pos">4</span><span class="who">Lena P. <small>Arnold split</small></span><span class="pts">1,640</span></div>
+        </div>
+      </div>
+      <div class="split-copy reveal d1">
+        <span class="eyebrow"><span class="dot"></span> The fun part</span>
+        <h2>Lifting, but make it a game</h2>
+        <p class="lead">Every set you log earns XP, levels you up and protects your streak. Each week you're sorted into a league and compete for promotion — the gentle pressure that turns "I'll go tomorrow" into a habit.</p>
+        <ul class="checks">
+          <li><span class="cb"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> XP, levels and daily streaks that reward consistency.</li>
+          <li><span class="cb"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Weekly leagues with promotion &amp; relegation.</li>
+          <li><span class="cb"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span> Add friends, compare stats and top your instance leaderboard.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Self-host / privacy ===================== -->
+  <section class="section" id="selfhost">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow"><span class="dot"></span> Your server, your rules</span>
+        <h2 style="margin-top:16px">Self-hosted and genuinely private</h2>
+        <p>1MoreRep runs entirely on infrastructure you control. No third parties, no ads, no data harvesting — just your training, kept where it belongs.</p>
+      </div>
+      <div class="privacy-grid">
+        <div class="pill-card reveal">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3Z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <h3>Data stays home</h3>
+          <p>Everything lives in your own Postgres database — your photos, metrics and history never leave your server.</p>
+        </div>
+        <div class="pill-card reveal d1">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.4"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+          <h3>Encrypted secrets</h3>
+          <p>SMTP and integration credentials are encrypted at rest; sessions and tokens are hardened by design.</p>
+        </div>
+        <div class="pill-card reveal d2">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13A4 4 0 0 1 16 11"/></svg></div>
+          <h3>Multi-user ready</h3>
+          <p>Invite your gym crew or run a whole community — roles, admin tools and per-user data, all built in.</p>
+        </div>
+        <div class="pill-card reveal d3">
+          <div class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5Z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></svg></div>
+          <h3>One-command deploy</h3>
+          <p>Docker Compose plus an install script. Migrations apply on boot, and upgrades are a single pull-and-rebuild.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FAQ ===================== -->
+  <section class="section" id="faq" style="background:var(--paper-2);border-block:1px solid var(--line)">
+    <div class="wrap">
+      <div class="section-head reveal">
+        <span class="eyebrow"><span class="dot"></span> Good to know</span>
+        <h2 style="margin-top:16px">Frequently asked</h2>
+      </div>
+      <div class="faq">
+        <details class="q reveal" open>
+          <summary>What exactly is 1MoreRep? <span class="pm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+          <div class="a">It's a self-hosted, multi-user gym tracker that runs in your browser and installs as an app. You log workouts, follow or auto-generate routines, track progress and body metrics, and compete in friendly weekly leagues — all on your own server.</div>
+        </details>
+        <details class="q reveal">
+          <summary>How much does it cost? <span class="pm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+          <div class="a">There are no subscriptions or per-seat fees from us — you host it yourself, so the only "cost" is the server it runs on. Your data is never monetised.</div>
+        </details>
+        <details class="q reveal">
+          <summary>Do I need to be technical to use it? <span class="pm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+          <div class="a">To <em>use</em> it, no — just open <a href="https://app.1morerep.de">app.1morerep.de</a> and sign in. Setting up your own instance takes a Docker host and a one-command install, aimed at anyone comfortable running a container.</div>
+        </details>
+        <details class="q reveal">
+          <summary>Does the AI send my data anywhere? <span class="pm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+          <div class="a">No. The workout generator is deterministic by default. The optional LLM assist runs against a self-hosted Ollama model on your own infrastructure — nothing is sent to a third-party cloud.</div>
+        </details>
+        <details class="q reveal">
+          <summary>Will it work on my phone? <span class="pm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+          <div class="a">Yes — it's a PWA. Open it in your mobile browser and choose "Add to Home Screen" for a full-screen, app-like experience with opt-in push reminders. It works great offline, too.</div>
+        </details>
+        <details class="q reveal">
+          <summary>Where do I sign in? <span class="pm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span></summary>
+          <div class="a">The app lives at <a href="https://app.1morerep.de">app.1morerep.de</a>. Use <a href="https://app.1morerep.de/login">the sign-in page</a> if you already have an account, or <a href="https://app.1morerep.de/register">create one</a> if registration is open on this instance.</div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Final CTA ===================== -->
+  <section class="cta-band">
+    <div class="wrap">
+      <div class="cta-card reveal">
+        <h2>Your next session is waiting.</h2>
+        <p>Open the app, log one workout, and feel the streak begin. One more rep starts now.</p>
+        <div class="hero-cta">
+          <a class="btn btn-light btn-lg" href="https://app.1morerep.de">Open the app
+            <svg class="arr" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn btn-lg" style="--bg:rgba(255,255,255,.16);--fg:#fff;box-shadow:none;border-color:rgba(255,255,255,.35)" href="https://app.1morerep.de/login">I have an account</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== Footer ===================== -->
+  <footer class="footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <a class="brand" href="#top" aria-label="1MoreRep home">
+            <img class="mark" src="favicon.svg" width="34" height="34" alt="" />
+            <span><b>1More</b><span>Rep</span></span>
+          </a>
+          <p class="tagline">A self-hosted gym tracker that makes training a game — and keeps your data yours.</p>
+        </div>
+        <div>
+          <h5>Product</h5>
+          <ul>
+            <li><a href="#features">Features</a></li>
+            <li><a href="#how">How it works</a></li>
+            <li><a href="#generator">Generator</a></li>
+            <li><a href="#selfhost">Self-host</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>App</h5>
+          <ul>
+            <li><a href="https://app.1morerep.de">Open app</a></li>
+            <li><a href="https://app.1morerep.de/login">Sign in</a></li>
+            <li><a href="https://app.1morerep.de/register">Create account</a></li>
+          </ul>
+        </div>
+        <div>
+          <h5>More</h5>
+          <ul>
+            <li><a href="#faq">FAQ</a></li>
+            <li><a href="https://app.1morerep.de">Status</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span id="year">2026</span> 1MoreRep</span>
+        <span>Self-hosted with <span class="heart">♥</span> · Your data never leaves your server</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js" defer></script>
+</body>
+</html>
