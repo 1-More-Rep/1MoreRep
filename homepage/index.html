@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>1MoreRep — Self-hosted workout tracker with streaks, leagues & a smart generator</title>
   <meta name="description" content="1MoreRep is a self-hosted, multi-user gym tracker PWA: log workouts, follow or auto-generate routines, track progress, and climb the leagues. Your data, your server, no subscriptions." />
-  <meta name="theme-color" content="#e2553a" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f1ea" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#17140f" />
   <!-- Progressive enhancement: only hide reveal elements when JS can un-hide them. -->
   <script>document.documentElement.classList.add('js');</script>
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
@@ -125,13 +126,13 @@
           </div>
         </div>
         <div class="float float-a">
-          <span class="ic" style="background:#e8f2ea;color:#4f9d69">
+          <span class="ic ic-green">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 7v5h-5"/></svg>
           </span>
           <div>+8% volume<small>vs. last week</small></div>
         </div>
         <div class="float float-b">
-          <span class="ic" style="background:#fdeee6;color:#cf4528">
+          <span class="ic ic-brand">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z"/></svg>
           </span>
           <div>League: Gold<small>Rank 2 of 30</small></div>
