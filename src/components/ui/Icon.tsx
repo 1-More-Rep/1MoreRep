@@ -119,6 +119,58 @@ const ICON_PATHS = {
     </>
   ),
   heart: <path d="M12 20S4 14.5 4 9.2A4.2 4.2 0 0 1 12 7a4.2 4.2 0 0 1 8 2.2C20 14.5 12 20 12 20Z" />,
+  monitor: (
+    <>
+      <rect x="3" y="4.5" width="18" height="12" rx="2" />
+      <path d="M9 20h6M12 16.5V20" />
+    </>
+  ),
+  megaphone: (
+    <>
+      <path d="M4 10v4a1.5 1.5 0 0 0 1.5 1.5H7l1 4h2l-1-4 9 3.5V6L8.5 9.5H5.5A1.5 1.5 0 0 0 4 11Z" />
+      <path d="M18 9a3 3 0 0 1 0 6" />
+    </>
+  ),
+  users: (
+    <>
+      <circle cx="9" cy="8.5" r="3.2" />
+      <path d="M3.5 20c.5-3.2 3-5 5.5-5s5 1.8 5.5 5" />
+      <path d="M16 5.2a3.2 3.2 0 0 1 0 6.3M17.5 20c-.2-1.6-.8-3-1.8-4" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M5 7h14M10 7V5h4v2M6.5 7l.8 12.5a1.5 1.5 0 0 0 1.5 1.4h6.4a1.5 1.5 0 0 0 1.5-1.4L18 7" />
+      <path d="M10 11v6M14 11v6" />
+    </>
+  ),
+  copy: (
+    <>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+    </>
+  ),
+  globe: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c2.5 2.4 2.5 14.6 0 17M12 3.5c-2.5 2.4-2.5 14.6 0 17" />
+    </>
+  ),
+  menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  link: (
+    <>
+      <path d="M9.5 14.5 14.5 9.5" />
+      <path d="M11 7.5 12.5 6a3.5 3.5 0 0 1 5 5l-1.5 1.5M13 16.5 11.5 18a3.5 3.5 0 0 1-5-5l1.5-1.5" />
+    </>
+  ),
+  qr: (
+    <>
+      <rect x="4" y="4" width="6" height="6" rx="1" />
+      <rect x="14" y="4" width="6" height="6" rx="1" />
+      <rect x="4" y="14" width="6" height="6" rx="1" />
+      <path d="M14 14h3v3M20 14v6M14 20h3" />
+    </>
+  ),
 } satisfies Record<string, JSX.Element>;
 
 export type IconName = keyof typeof ICON_PATHS;

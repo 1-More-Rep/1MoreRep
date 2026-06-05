@@ -4,14 +4,30 @@
 export type Density = 'compact' | 'regular' | 'comfy';
 export type FontPairing = 'calm' | 'techy' | 'friendly';
 export type IconStyle = 'line' | 'soft' | 'solid';
+/** User color-scheme preference. 'system' follows the OS (falling back to dark). */
+export type ThemeMode = 'system' | 'light' | 'dark';
 
 export interface ThemeTweaks {
+  /** The user's preference. The default is 'system'. */
+  mode: ThemeMode;
+  /** Resolved dark flag (derived from `mode` + the OS preference). buildVars reads this. */
   dark: boolean;
   accent: string;
   font: FontPairing;
   radius: number;
   density: Density;
   iconStyle: IconStyle;
+}
+
+/**
+ * Resolve the effective dark flag from a mode and the OS preference.
+ * 'system' follows the OS; when the OS preference can't be determined we fall
+ * back to DARK (never light), per product requirement.
+ */
+export function resolveDark(mode: ThemeMode, systemPrefersDark: boolean): boolean {
+  if (mode === 'dark') return true;
+  if (mode === 'light') return false;
+  return systemPrefersDark;
 }
 
 export const ACCENTS = [
@@ -74,7 +90,8 @@ const DARK = {
 };
 
 export const DEFAULT_TWEAKS: ThemeTweaks = {
-  dark: false,
+  mode: 'system',
+  dark: true, // safe fallback until the OS preference is resolved (never flash light)
   accent: '#e2553a',
   font: 'friendly',
   radius: 16,

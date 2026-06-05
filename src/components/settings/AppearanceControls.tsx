@@ -3,8 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { saveAppearanceAction } from '@/server/actions/appearance';
-import { ACCENTS, ACCENT_NAMES, DENSITY, FONTS, type Density, type FontPairing } from '@/lib/theme/tokens';
-import { Btn, Card, Mono, SectionLabel } from '@/components/ui';
+import { ACCENTS, ACCENT_NAMES, DENSITY, FONTS, type Density, type FontPairing, type ThemeMode } from '@/lib/theme/tokens';
+import { Btn, Card, Mono, SectionLabel, Segmented } from '@/components/ui';
 
 const selectStyle: React.CSSProperties = {
   height: 40,
@@ -37,9 +37,16 @@ export function AppearanceControls() {
     <Card style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <div>
         <SectionLabel style={{ marginBottom: 10 }}>Theme</SectionLabel>
-        <Btn kind="soft" size="sm" icon={tweaks.dark ? 'sun' : 'moon'} onClick={() => setTweak('dark', !tweaks.dark)}>
-          {tweaks.dark ? 'Switch to light' : 'Switch to dark'}
-        </Btn>
+        <Segmented<ThemeMode>
+          ariaLabel="Color theme"
+          value={tweaks.mode}
+          onChange={(m) => setTweak('mode', m)}
+          options={[
+            { value: 'system', label: 'System', icon: 'monitor' },
+            { value: 'light', label: 'Light', icon: 'sun' },
+            { value: 'dark', label: 'Dark', icon: 'moon' },
+          ]}
+        />
       </div>
 
       <div>

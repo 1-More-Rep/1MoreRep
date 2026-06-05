@@ -40,6 +40,19 @@ pnpm e2e            # playwright (builds + starts the app)
 docker compose up --build       # app + postgres; health at /api/health
 ```
 
+## Update a self-hosted instance
+
+```bash
+./update.sh            # pulls the tracked branch, rebuilds + redeploys ONLY if
+                       # there are new commits, then waits for /api/health.
+./update.sh --force    # rebuild + redeploy even when already up to date
+```
+
+`update.sh` is **self-aware**: if a pull changes the script itself, it re-executes
+the freshly-pulled copy so the new build/deploy logic runs (never the stale one).
+A no-op update exits immediately with zero downtime. Secrets in `.env` are
+preserved. (`upgrade.sh` is a deprecated alias that forwards to `update.sh`.)
+
 ## Project layout
 
 ```

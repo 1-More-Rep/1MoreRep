@@ -40,7 +40,13 @@ export default function DesignSystemPage() {
       <Card>
         <SectionLabel style={{ marginBottom: 14 }}>Tweaks</SectionLabel>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, alignItems: 'center' }}>
-          <Btn kind="soft" size="sm" icon={tweaks.dark ? 'sun' : 'moon'} data-testid="toggle-dark" onClick={() => setTweak('dark', !tweaks.dark)}>
+          <Btn
+            kind="soft"
+            size="sm"
+            icon={tweaks.dark ? 'sun' : 'moon'}
+            data-testid="toggle-dark"
+            onClick={() => setTweak('mode', tweaks.dark ? 'light' : 'dark')}
+          >
             {tweaks.dark ? 'Light' : 'Dark'}
           </Btn>
 

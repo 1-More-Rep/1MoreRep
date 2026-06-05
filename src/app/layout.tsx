@@ -10,6 +10,7 @@ import {
 import { headers } from 'next/headers';
 import './globals.css';
 import { ThemeProvider, themeBootScript } from '@/components/theme/ThemeProvider';
+import { ToastProvider } from '@/components/ui';
 import { PwaRegister } from '@/components/pwa/PwaRegister';
 import { getSettings } from '@/lib/settings';
 
@@ -49,14 +50,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // suppressHydrationWarning: themeBootScript (below) mutates data-theme / data-icon-style
     // on <html> before React hydrates, to honor the stored preference without a flash. That
     // deliberate server/client attribute difference is expected — suppress the warning it
-    // would otherwise raise on every route. (Scoped to <html>'s own attributes only.)
-    <html lang="en" data-theme="light" data-icon-style="soft" className={fontVars} suppressHydrationWarning>
+    // would otherwise raise on every route. We intentionally DON'T hardcode data-theme here:
+    // the boot script sets it for JS clients (stored or system-resolved), and a
+    // prefers-color-scheme fallback in globals.css covers no-JS. (Scoped to <html> attrs.)
+    <html lang="en" data-icon-style="soft" className={fontVars} suppressHydrationWarning>
       <head>
-        {/* Apply stored theme before first paint to avoid a flash of default theme. */}
+        {/* Apply stored/system theme before first paint to avoid a flash of the wrong theme. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </ThemeProvider>
         <PwaRegister />
       </body>
     </html>

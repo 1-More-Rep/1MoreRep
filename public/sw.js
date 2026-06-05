@@ -1,7 +1,7 @@
 /* 1MoreRep service worker — app-shell precache + offline fallback + data caching + web push. */
-const CACHE = '1mr-v2';
+const CACHE = '1mr-v3';
 // App shell: a cold offline start should render the app + offline page.
-const PRECACHE = ['/app', '/offline', '/icons/icon-192.png', '/icons/icon-512.png'];
+const PRECACHE = ['/app', '/offline', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/badge-96.png'];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -89,7 +89,10 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(title, {
       body: data.body || '',
       icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
+      // Android status-bar badge: must be a monochrome, transparent-background
+      // glyph (the alpha is tinted by the system). A full-color icon here renders
+      // as a white square.
+      badge: '/icons/badge-96.png',
       tag: data.tag,
       data: { url: data.url || '/app' },
     }),

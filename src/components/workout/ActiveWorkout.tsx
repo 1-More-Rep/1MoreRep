@@ -43,7 +43,8 @@ function notifyRestDone() {
       reg.showNotification('Rest complete', {
         body: 'Time for your next set 💪',
         icon: '/icons/icon-192.png',
-        badge: '/icons/icon-192.png',
+        // Monochrome transparent badge for the Android status bar (see public/sw.js).
+        badge: '/icons/badge-96.png',
         tag: 'rest-timer-done',
       }),
     )

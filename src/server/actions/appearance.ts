@@ -10,7 +10,8 @@ import { requireUser } from '@/lib/auth/guards';
 // bounded to the known ThemeTweaks domain. `.partial()` allows storing a subset of tweaks.
 const appearanceSchema = z
   .object({
-    dark: z.boolean(),
+    mode: z.enum(['system', 'light', 'dark']),
+    dark: z.boolean(), // derived cache; accepted for back-compat but `mode` is authoritative
     accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     font: z.enum(['calm', 'techy', 'friendly']),
     radius: z.number().int().min(4).max(24),

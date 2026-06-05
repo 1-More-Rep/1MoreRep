@@ -23,7 +23,9 @@ async function main() {
 
   const ex = await seedExercises(prisma);
   // eslint-disable-next-line no-console
-  console.log(`[seed] exercises: +${ex.created} new, ${ex.skipped} existing (of ${ex.total})`);
+  console.log(
+    `[seed] exercises: +${ex.created} new, ${ex.skipped} existing (of ${ex.total}); German overlay backfilled ${ex.deBackfilled}`,
+  );
   if (ex.unmappedMuscles.length) {
     // eslint-disable-next-line no-console
     console.warn('[seed] unmapped muscle strings:', ex.unmappedMuscles.join(', '));

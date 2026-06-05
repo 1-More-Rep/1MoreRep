@@ -46,6 +46,14 @@ enum UnitSystem {
   IMPERIAL
 }
 
+/// Optional, self-reported. Powers sex-specific strength standards on the muscle
+/// map. UNSPECIFIED (the default / "prefer not to say") uses unisex bands.
+enum Sex {
+  FEMALE
+  MALE
+  UNSPECIFIED
+}
+
 model User {
   id              String     @id @default(cuid())
   email           String     @unique // stored normalized (lowercased, trimmed)
@@ -57,6 +65,8 @@ model User {
   displayName String
   avatarKey   String? // object-store key, never a public path
   unitSystem  UnitSystem @default(METRIC)
+  locale      String     @default("en") // account-bound UI/email/push language: 'en' | 'de'
+  sex         Sex        @default(UNSPECIFIED) // optional; sex-specific strength standards
   timezone    String     @default("UTC") // drives tz-correct streak/league day keys
 
   // Training profile (captured during onboarding) — drives generator defaults.
@@ -282,6 +292,8 @@ model Exercise {
   force          Force?
   level          String?
   instructions   String[]
+  nameDe         String? // German display-name overlay (seed-provided); falls back to `name`
+  instructionsDe String[]         @default([]) // German instructions overlay; falls back to `instructions`
   iconKey        String           @default("dumbbell")
   defaultSets    Int              @default(3)
   defaultRepLow  Int              @default(8)
@@ -617,8 +629,13 @@ model Notification {
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   kind      NotifKind
+  // title/body hold a rendered fallback (creator's/default locale). When titleKey
+  // is set, the in-app feed re-localizes to the VIEWER's locale at read time.
   title     String
   body      String
+  titleKey  String? // i18n message key, e.g. "notifications.friendRequest.title"
+  bodyKey   String?
+  params    Json? // interpolation params for titleKey/bodyKey
   data      Json?
   readAt    DateTime?
   createdAt DateTime  @default(now())

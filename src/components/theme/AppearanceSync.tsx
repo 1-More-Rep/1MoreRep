@@ -1,24 +1,25 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useTheme, THEME_STORAGE_KEY } from '@/components/theme/ThemeProvider';
+import { useTheme } from '@/components/theme/ThemeProvider';
 import type { ThemeTweaks } from '@/lib/theme/tokens';
 
 /**
- * Seeds the account-saved appearance on a device that has no local preference yet
- * (e.g. a fresh login on another device), so theme tweaks follow the account.
- * A device with an existing local choice keeps it.
+ * Account-first theme sync. The account-saved appearance is the source of truth and
+ * is applied on every authenticated load, so the theme follows the user across
+ * devices (the per-device localStorage value is only a fast cache, not the authority).
  */
 export function AppearanceSync({ saved }: { saved: Partial<ThemeTweaks> | null }) {
   const { setTweaks } = useTheme();
   useEffect(() => {
-    if (!saved) return;
-    try {
-      if (!localStorage.getItem(THEME_STORAGE_KEY)) setTweaks(saved);
-    } catch {
-      /* ignore */
+    if (!saved || Object.keys(saved).length === 0) return;
+    // Back-fill mode from a legacy `dark` boolean so old accounts resolve correctly.
+    const next: Partial<ThemeTweaks> = { ...saved };
+    if (next.mode === undefined && typeof next.dark === 'boolean') {
+      next.mode = next.dark ? 'dark' : 'light';
     }
-    // run once on mount
+    setTweaks(next);
+    // run once on mount with the server-provided account value
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return null;

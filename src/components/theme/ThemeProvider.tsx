@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { buildVars, DEFAULT_TWEAKS, type ThemeTweaks } from '@/lib/theme/tokens';
+import { buildVars, DEFAULT_TWEAKS, resolveDark, type ThemeMode, type ThemeTweaks } from '@/lib/theme/tokens';
 
 export const THEME_STORAGE_KEY = '1mr-theme';
 
@@ -14,22 +14,40 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-/** Apply a tweak set to the document root (CSS vars + data-theme + icon style). */
+/** True when the OS prefers dark; defaults to DARK when it can't be determined. */
+function systemPrefersDark(): boolean {
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  } catch {
+    return true;
+  }
+}
+
+/** Apply a tweak set to the document root (CSS vars + data-theme + color-scheme + icon style). */
 export function applyTweaks(tweaks: ThemeTweaks, root: HTMLElement = document.documentElement) {
   const vars = buildVars(tweaks);
   for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
   root.setAttribute('data-theme', tweaks.dark ? 'dark' : 'light');
+  root.style.colorScheme = tweaks.dark ? 'dark' : 'light';
   root.setAttribute('data-icon-style', tweaks.iconStyle);
+}
+
+/** Migrate a persisted tweak set: back-fill `mode` from a legacy `dark` boolean. */
+function normalize(raw: Partial<ThemeTweaks>): ThemeTweaks {
+  const merged: ThemeTweaks = { ...DEFAULT_TWEAKS, ...raw };
+  if (!raw.mode && typeof raw.dark === 'boolean') merged.mode = raw.dark ? 'dark' : 'light';
+  merged.dark = resolveDark(merged.mode, systemPrefersDark());
+  return merged;
 }
 
 function readStored(): ThemeTweaks {
   if (typeof window === 'undefined') return DEFAULT_TWEAKS;
   try {
     const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
-    if (!raw) return DEFAULT_TWEAKS;
-    return { ...DEFAULT_TWEAKS, ...(JSON.parse(raw) as Partial<ThemeTweaks>) };
+    if (!raw) return normalize({});
+    return normalize(JSON.parse(raw) as Partial<ThemeTweaks>);
   } catch {
-    return DEFAULT_TWEAKS;
+    return normalize({});
   }
 }
 
@@ -40,10 +58,9 @@ export function ThemeProvider({
   children: React.ReactNode;
   initial?: Partial<ThemeTweaks>;
 }) {
-  const [tweaks, setState] = useState<ThemeTweaks>({ ...DEFAULT_TWEAKS, ...initial });
+  const [tweaks, setState] = useState<ThemeTweaks>(() => normalize({ ...initial }));
 
-  // Hydrate from localStorage on mount (server can't know per-user prefs yet; in
-  // later phases the user's saved appearance settings seed `initial`).
+  // Hydrate from localStorage on mount (account-saved prefs are applied by AppearanceSync).
   useEffect(() => {
     setState(readStored());
   }, []);
@@ -58,13 +75,37 @@ export function ThemeProvider({
     }
   }, [tweaks]);
 
+  // Live OS theme changes only matter while following the system.
+  useEffect(() => {
+    let mql: MediaQueryList;
+    try {
+      mql = window.matchMedia('(prefers-color-scheme: dark)');
+    } catch {
+      return;
+    }
+    const onChange = () =>
+      setState((prev) => (prev.mode === 'system' ? { ...prev, dark: mql.matches } : prev));
+    mql.addEventListener?.('change', onChange);
+    return () => mql.removeEventListener?.('change', onChange);
+  }, []);
+
+  // Setting `mode` must re-resolve the derived `dark`.
   const setTweak = useCallback<ThemeContextValue['setTweak']>((key, value) => {
-    setState((prev) => ({ ...prev, [key]: value }));
+    setState((prev) => {
+      const next = { ...prev, [key]: value };
+      if (key === 'mode') next.dark = resolveDark(value as ThemeMode, systemPrefersDark());
+      return next;
+    });
   }, []);
   const setTweaks = useCallback((next: Partial<ThemeTweaks>) => {
-    setState((prev) => ({ ...prev, ...next }));
+    setState((prev) => {
+      const merged = { ...prev, ...next };
+      // When the mode is (re)set, the derived dark flag must be recomputed.
+      if (next.mode !== undefined) merged.dark = resolveDark(merged.mode, systemPrefersDark());
+      return merged;
+    });
   }, []);
-  const reset = useCallback(() => setState(DEFAULT_TWEAKS), []);
+  const reset = useCallback(() => setState(normalize({})), []);
 
   const value = useMemo(() => ({ tweaks, setTweak, setTweaks, reset }), [tweaks, setTweak, setTweaks, reset]);
 
@@ -78,22 +119,28 @@ export function useTheme(): ThemeContextValue {
 }
 
 /**
- * Inline, render-blocking script that applies the stored theme before paint to
- * avoid a flash of the default theme. Injected once in the root layout.
+ * Inline, render-blocking script that applies the stored (or system-resolved) theme
+ * before first paint to avoid a flash. Injected once in the root layout. When no
+ * preference is stored — or the stored mode is 'system' — it reads the OS preference,
+ * defaulting to DARK if that can't be determined.
  */
 export const themeBootScript = `
 (function(){
   try {
-    var raw = localStorage.getItem('${THEME_STORAGE_KEY}');
-    if(!raw) return;
-    var t = JSON.parse(raw);
     var r = document.documentElement, s = r.style;
-    if (t && typeof t.dark === 'boolean') r.setAttribute('data-theme', t.dark ? 'dark' : 'light');
+    var raw = localStorage.getItem('${THEME_STORAGE_KEY}');
+    var t = null; try { t = raw ? JSON.parse(raw) : null; } catch(e) {}
+    var mode = (t && t.mode) ? t.mode : ((t && typeof t.dark === 'boolean') ? (t.dark ? 'dark' : 'light') : 'system');
+    var dark;
+    if (mode === 'dark') dark = true;
+    else if (mode === 'light') dark = false;
+    else { try { dark = window.matchMedia('(prefers-color-scheme: dark)').matches; } catch(e){ dark = true; } }
+    r.setAttribute('data-theme', dark ? 'dark' : 'light');
+    s.colorScheme = dark ? 'dark' : 'light';
     if (t && t.iconStyle) r.setAttribute('data-icon-style', t.iconStyle);
     if (t && t.accent) {
       s.setProperty('--accent', t.accent);
-      // light-mode accent-text must match buildVars (color-mix 58% #000), not raw accent.
-      s.setProperty('--accent-text', t.dark ? 'color-mix(in oklab, '+t.accent+' 78%, white)' : 'color-mix(in oklab, '+t.accent+' 58%, #000)');
+      s.setProperty('--accent-text', dark ? 'color-mix(in oklab, '+t.accent+' 78%, white)' : 'color-mix(in oklab, '+t.accent+' 58%, #000)');
     }
     if (t && typeof t.radius === 'number') {
       var rad = Math.round(t.radius);
