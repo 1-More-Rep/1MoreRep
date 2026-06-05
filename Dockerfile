@@ -68,6 +68,13 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 COPY --from=build /app/prisma ./prisma
+# The boot-time seed (`tsx prisma/seed/index.ts`, run by the entrypoint) imports a
+# little shared app code — src/lib/auth/password (argon2 hashing for the superadmin)
+# and src/domain/exercises/muscleWeights (curated weights, shared with the generator,
+# so NOT duplicated into the seed). tsx resolves these lazily, loading only the seed's
+# import graph — no server-only/Next modules are pulled in. Ship src/ so the seed runs.
+COPY --from=build /app/src ./src
+COPY --from=build /app/tsconfig.json ./tsconfig.json
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/docker-entrypoint.sh ./docker-entrypoint.sh
 

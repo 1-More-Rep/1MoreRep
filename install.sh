@@ -9,6 +9,9 @@ cd "$(dirname "$0")"
 ALLOW_ROOT=0
 ADMIN_EMAIL="${SUPERADMIN_EMAIL:-}"
 APP_URL_ARG="${APP_URL:-}"
+# Treat a port supplied via the APP_PORT env var (or --port below) as explicit: honor it
+# and fail fast on a collision, rather than silently auto-picking another port.
+APP_PORT_EXPLICIT=0; [ -n "${APP_PORT:-}" ] && APP_PORT_EXPLICIT=1
 APP_PORT="${APP_PORT:-3000}"
 PORT_FLAG_SET=0
 
@@ -25,6 +28,25 @@ done
 
 log() { printf '\033[1;36m[install]\033[0m %s\n' "$*"; }
 err() { printf '\033[1;31m[install]\033[0m %s\n' "$*" >&2; }
+
+# --- Port helpers ---
+valid_port() { case "$1" in (''|*[!0-9]*) return 1 ;; esac; [ "$1" -ge 1 ] && [ "$1" -le 65535 ]; }
+
+# True (returns 0) when nothing is listening on TCP port $1 on this host. Tries ss,
+# then lsof, then a loopback connect — so it degrades gracefully on minimal hosts.
+is_port_free() {
+  local p="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ! ss -ltn 2>/dev/null | awk '{print $4}' | grep -qE ":${p}\$"
+  elif command -v lsof >/dev/null 2>&1; then
+    ! lsof -iTCP:"$p" -sTCP:LISTEN -n -P >/dev/null 2>&1
+  else
+    ! (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null
+  fi
+}
+
+# Echo the first free TCP port at or after $1.
+find_free_port() { local p="$1"; while ! is_port_free "$p"; do p=$((p + 1)); done; printf '%s' "$p"; }
 
 # --- Preflight ---
 if [ "$(id -u)" = "0" ] && [ "$ALLOW_ROOT" != "1" ]; then
@@ -50,6 +72,37 @@ if [ -f .env ]; then
   [ -n "$ENV_URL" ] && APP_URL_ARG="$ENV_URL"
 else
   log "Fresh install — generating secrets…"
+
+  # --- Host port selection ---
+  # Pick the published host port up front so the localhost URL default can reference it.
+  # If the port was pinned (--port / APP_PORT), honor it but fail fast on a collision.
+  # Otherwise pick a free default and, in an interactive shell, let the user confirm.
+  if [ "$PORT_FLAG_SET" = 1 ] || [ "$APP_PORT_EXPLICIT" = 1 ]; then
+    valid_port "$APP_PORT" || { err "Invalid port: ${APP_PORT}"; exit 1; }
+    if ! is_port_free "$APP_PORT"; then
+      err "Requested port ${APP_PORT} is already in use. Free it or pick another (next free: $(find_free_port "$APP_PORT"))."
+      exit 1
+    fi
+  else
+    DEFAULT_PORT="$APP_PORT"
+    if ! is_port_free "$DEFAULT_PORT"; then
+      DEFAULT_PORT="$(find_free_port "$DEFAULT_PORT")"
+      log "Port ${APP_PORT} is in use; suggesting ${DEFAULT_PORT}."
+    fi
+    if [ -t 0 ]; then
+      while :; do
+        read -r -p "Host port to publish the app on [${DEFAULT_PORT}]: " APP_PORT_IN
+        APP_PORT="${APP_PORT_IN:-$DEFAULT_PORT}"
+        valid_port "$APP_PORT" || { err "Not a valid port: ${APP_PORT}"; continue; }
+        is_port_free "$APP_PORT" && break
+        err "Port ${APP_PORT} is already in use; pick another."
+      done
+    else
+      APP_PORT="$DEFAULT_PORT"
+      log "Non-interactive shell — using port ${APP_PORT}."
+    fi
+  fi
+
   [ -z "$APP_URL_ARG" ] && read -r -p "Public URL (e.g. https://gym.example.com) [http://localhost:${APP_PORT}]: " APP_URL_ARG
   APP_URL_ARG="${APP_URL_ARG:-http://localhost:${APP_PORT}}"
   while [ -z "$ADMIN_EMAIL" ]; do read -r -p "Superadmin email: " ADMIN_EMAIL; done
@@ -86,6 +139,13 @@ else
       COMPOSE_PROFILES="caddy"
       APP_BIND="127.0.0.1"
       log "Public https URL — enabling the Caddy HTTPS proxy (domain: ${CADDY_DOMAIN}); app port bound to loopback."
+      # Caddy needs host ports 80 + 443 for ACME + HTTPS. Warn (don't block) if either is
+      # taken — e.g. another reverse proxy is already running — since the stack `up` would
+      # then fail. In that case front the app with your existing proxy instead (see
+      # deploy/nginx.conf.example) and leave COMPOSE_PROFILES empty.
+      for cp in 80 443; do
+        is_port_free "$cp" || err "Warning: port ${cp} is already in use — Caddy will fail to bind it. Use your existing proxy instead (deploy/nginx.conf.example) and unset COMPOSE_PROFILES."
+      done
       ;;
   esac
 
