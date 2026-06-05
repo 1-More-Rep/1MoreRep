@@ -80,13 +80,13 @@ export async function searchUsersByHandle(q: string, viewerId: string) {
 
 export async function sendFriendRequest(requesterId: string, handle: string): Promise<{ error?: string; ok?: boolean }> {
   const target = await prisma.user.findUnique({ where: { publicHandle: handle }, select: { id: true } });
-  if (!target) return { error: 'No user with that handle.' };
-  if (target.id === requesterId) return { error: "You can't add yourself." };
-  if (await areBlocked(requesterId, target.id)) return { error: 'Unable to send request.' };
+  if (!target) return { error: 'noUserHandle' };
+  if (target.id === requesterId) return { error: 'cantAddSelf' };
+  if (await areBlocked(requesterId, target.id)) return { error: 'unableSend' };
 
   const existing = await friendshipStatus(requesterId, target.id);
-  if (existing === 'ACCEPTED') return { error: 'Already friends.' };
-  if (existing === 'PENDING') return { error: 'Request already pending.' };
+  if (existing === 'ACCEPTED') return { error: 'alreadyFriends' };
+  if (existing === 'PENDING') return { error: 'requestPending' };
 
   await prisma.friendship.upsert({
     where: { requesterId_addresseeId: { requesterId, addresseeId: target.id } },

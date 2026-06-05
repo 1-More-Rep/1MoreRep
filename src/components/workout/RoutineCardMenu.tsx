@@ -72,7 +72,7 @@ export function RoutineCardMenu({ routineId, name }: { routineId: string; name: 
       >
         <Icon name="more" size={18} />
       </button>
-      <Sheet open={open} onClose={() => setOpen(false)} title={name}>
+      <Sheet open={open} onClose={() => { setConfirmArchive(false); setOpen(false); }} title={name}>
         {confirmArchive ? (
           <div>
             <p style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.5, marginTop: 0 }}>

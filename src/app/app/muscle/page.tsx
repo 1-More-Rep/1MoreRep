@@ -17,7 +17,7 @@ export default async function MusclePage() {
   const user = await requireUser();
   const fatigue = await computeAndCacheFatigue(user.id);
   const weeklyVolume = await weeklyVolumeByMuscle(user.id, new Date());
-  const { bodyweightKg, byMuscle: strength } = await computeMuscleStrength(user.id, user.sex);
+  const { bodyweightKg, byMuscle: strength } = await computeMuscleStrength(user.id, user.sex, locale);
 
   const data = {} as Record<Muscle, MuscleInfo>;
   for (const m of MUSCLES) {

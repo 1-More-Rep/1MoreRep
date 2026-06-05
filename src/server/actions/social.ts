@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getTranslations } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { sendFriendRequest, respondToRequest, removeFriend, blockUser, searchUsersByHandle } from '@/server/social/friends';
 import { generateInviteLink, acceptInvite } from '@/server/social/inviteLink';
@@ -15,12 +16,13 @@ export interface SocialState {
 
 export async function addFriendAction(_prev: SocialState, formData: FormData): Promise<SocialState> {
   const user = await requireUser();
+  const t = await getTranslations('socialErr');
   const handle = String(formData.get('handle') ?? '').trim();
-  if (!handle) return { error: 'Enter a handle.' };
+  if (!handle) return { error: t('enterHandle') };
   const r = await sendFriendRequest(user.id, handle);
-  if (r.error) return { error: r.error };
+  if (r.error) return { error: t(r.error) };
   revalidatePath('/app/profile/friends');
-  return { notice: 'Friend request sent.' };
+  return { notice: t('requestSent') };
 }
 
 export async function respondFriendAction(requesterId: string, accept: boolean): Promise<void> {
@@ -43,17 +45,19 @@ export async function searchUsersAction(q: string) {
 /** Send a friend request to an exact handle (used by the typeahead result click). */
 export async function sendRequestByHandleAction(handle: string): Promise<SocialState> {
   const user = await requireUser();
+  const t = await getTranslations('socialErr');
   const r = await sendFriendRequest(user.id, handle);
-  if (r.error) return { error: r.error };
+  if (r.error) return { error: t(r.error) };
   revalidatePath('/app/profile/friends');
-  return { notice: 'Friend request sent.' };
+  return { notice: t('requestSent') };
 }
 
 export async function blockUserActionResult(targetId: string): Promise<SocialState> {
   const user = await requireUser();
+  const t = await getTranslations('socialErr');
   await blockUser(user.id, targetId);
   revalidatePath('/app/profile/friends');
-  return { notice: 'User blocked.' };
+  return { notice: t('userBlocked') };
 }
 
 /** Mint a shareable invite link and return its app-relative join URL. */
@@ -66,10 +70,11 @@ export async function generateInviteLinkAction(): Promise<{ url: string }> {
 /** Accept a shared invite link, becoming friends with its creator. */
 export async function acceptInviteAction(code: string): Promise<SocialState> {
   const user = await requireUser();
+  const t = await getTranslations('socialErr');
   const r = await acceptInvite(code, user.id);
-  if (r.error) return { error: r.error };
+  if (r.error) return { error: t(r.error) };
   revalidatePath('/app/profile/friends');
-  return { notice: 'You are now friends!' };
+  return { notice: t('nowFriends') };
 }
 
 export async function updatePrivacyAction(_prev: SocialState, formData: FormData): Promise<SocialState> {

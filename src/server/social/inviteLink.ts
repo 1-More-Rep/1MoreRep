@@ -30,9 +30,9 @@ export async function peekInvite(
     where: { code },
     include: { creator: { select: { displayName: true, publicHandle: true } } },
   });
-  if (!invite) return { error: 'This invite link is invalid.' };
-  if (invite.expiresAt && invite.expiresAt < new Date()) return { error: 'This invite link has expired.' };
-  if (invite.maxUses != null && invite.useCount >= invite.maxUses) return { error: 'This invite link has been used up.' };
+  if (!invite) return { error: 'inviteInvalid' };
+  if (invite.expiresAt && invite.expiresAt < new Date()) return { error: 'inviteExpired' };
+  if (invite.maxUses != null && invite.useCount >= invite.maxUses) return { error: 'inviteUsedUp' };
   if (invite.creatorId === viewerId) return { self: true, creator: invite.creator };
   return { creator: invite.creator };
 }
@@ -40,11 +40,11 @@ export async function peekInvite(
 /** Accept an invite link: becomes friends with the creator. Idempotent and validated. */
 export async function acceptInvite(code: string, accepterId: string): Promise<{ error?: string; ok?: boolean }> {
   const invite = await prisma.inviteLink.findUnique({ where: { code } });
-  if (!invite) return { error: 'This invite link is invalid.' };
-  if (invite.expiresAt && invite.expiresAt < new Date()) return { error: 'This invite link has expired.' };
-  if (invite.maxUses != null && invite.useCount >= invite.maxUses) return { error: 'This invite link has been used up.' };
-  if (invite.creatorId === accepterId) return { error: "You can't accept your own invite." };
-  if (await areBlocked(invite.creatorId, accepterId)) return { error: 'Unable to accept this invite.' };
+  if (!invite) return { error: 'inviteInvalid' };
+  if (invite.expiresAt && invite.expiresAt < new Date()) return { error: 'inviteExpired' };
+  if (invite.maxUses != null && invite.useCount >= invite.maxUses) return { error: 'inviteUsedUp' };
+  if (invite.creatorId === accepterId) return { error: 'cantAcceptOwn' };
+  if (await areBlocked(invite.creatorId, accepterId)) return { error: 'unableAccept' };
 
   // A friendship may already exist in either direction (e.g. a pending request the
   // accepter sent). Collapse it to a single ACCEPTED row keyed creator→accepter.

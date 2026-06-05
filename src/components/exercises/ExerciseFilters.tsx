@@ -3,12 +3,13 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { MUSCLES, MUSCLE_LABEL } from '@/domain/muscles/taxonomy';
+import { MUSCLES } from '@/domain/muscles/taxonomy';
 
 const EQUIPMENT = ['BARBELL', 'DUMBBELL', 'MACHINE', 'CABLE', 'BODYWEIGHT', 'KETTLEBELL', 'BAND', 'EZ_BAR', 'BALL', 'OTHER'];
 
 export function ExerciseFilters() {
   const t = useTranslations('exercises');
+  const tm = useTranslations('muscleNames');
   const router = useRouter();
   const sp = useSearchParams();
   const [pending, start] = useTransition();
@@ -33,7 +34,7 @@ export function ExerciseFilters() {
       <select aria-label={t('muscleAria')} value={sp.get('muscle') ?? ''} onChange={(e) => setParam('muscle', e.target.value)} style={input}>
         <option value="">{t('allMuscles')}</option>
         {MUSCLES.map((m) => (
-          <option key={m} value={m}>{MUSCLE_LABEL[m]}</option>
+          <option key={m} value={m}>{tm(m)}</option>
         ))}
       </select>
       <select aria-label={t('equipmentAria')} value={sp.get('equipment') ?? ''} onChange={(e) => setParam('equipment', e.target.value)} style={input}>

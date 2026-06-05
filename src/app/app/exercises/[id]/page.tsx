@@ -4,7 +4,7 @@ import { getTranslations, getLocale } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { getExercise, getExerciseSetHistory } from '@/server/queries/exercises';
 import { exName, exInstructions } from '@/lib/i18n/exercise';
-import { MUSCLE_LABEL, type Muscle } from '@/domain/muscles/taxonomy';
+import { type Muscle } from '@/domain/muscles/taxonomy';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
 import { Mono, SectionLabel } from '@/components/ui/typography';
@@ -18,6 +18,7 @@ const short = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 
 
 export default async function ExerciseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const t = await getTranslations('exercises');
+  const tm = await getTranslations('muscleNames');
   const locale = await getLocale();
   const user = await requireUser();
   const { id } = await params;
@@ -57,7 +58,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
           {links.map((m) => (
             <div key={m.muscle} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 14, width: 110, color: m.role === 'PRIMARY' ? 'var(--text)' : 'var(--text-2)', fontWeight: m.role === 'PRIMARY' ? 600 : 500 }}>
-                {MUSCLE_LABEL[m.muscle]}
+                {tm(m.muscle)}
               </span>
               <div style={{ flex: 1, height: 8, background: 'var(--surface-2)', borderRadius: 'var(--r-pill)', overflow: 'hidden' }}>
                 <div style={{ width: `${Math.round(m.weight * 100)}%`, height: '100%', background: 'var(--accent)', borderRadius: 'var(--r-pill)' }} />
@@ -94,8 +95,8 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
           }}
           regionLabel={(m) =>
             involvement[m]
-              ? t('regionInvolvement', { muscle: MUSCLE_LABEL[m], pct: Math.round(involvement[m]! * 100) })
-              : MUSCLE_LABEL[m]
+              ? t('regionInvolvement', { muscle: tm(m), pct: Math.round(involvement[m]! * 100) })
+              : tm(m)
           }
         />
       </Card>

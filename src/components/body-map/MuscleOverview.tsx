@@ -3,7 +3,6 @@
 import { useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import type { Muscle } from '@prisma/client';
-import { MUSCLE_LABEL } from '@/domain/muscles/taxonomy';
 import type { Landmark } from '@/domain/generator/landmarks';
 import { reportSorenessAction } from '@/server/actions/fatigue';
 import { fatigueToTint } from '@/domain/fatigue/model';
@@ -134,6 +133,7 @@ export function MuscleOverview({
 }) {
   const t = useTranslations('muscles');
   const tTier = useTranslations('strengthTier');
+  const tm = useTranslations('muscleNames');
   const [mode, setMode] = useState<Mode>('recovery');
   const [selected, setSelected] = useState<Muscle | null>(null);
   const [pending, start] = useTransition();
@@ -149,13 +149,13 @@ export function MuscleOverview({
   const regionLabel = (m: Muscle) => {
     if (mode === 'recovery') {
       const eta = data[m]?.recoveryEtaHours ?? 0;
-      const base = t('regionFatigued', { muscle: MUSCLE_LABEL[m], pct: Math.round((data[m]?.fatigue ?? 0) * 100) });
+      const base = t('regionFatigued', { muscle: tm(m), pct: Math.round((data[m]?.fatigue ?? 0) * 100) });
       return eta > 0 ? base + t('regionRecovers', { hours: Math.round(eta) }) : base;
     }
     const s = strength[m];
     return s
-      ? t('regionStrength', { muscle: MUSCLE_LABEL[m], tier: tTier(s.tier) })
-      : t('regionNoData', { muscle: MUSCLE_LABEL[m] });
+      ? t('regionStrength', { muscle: tm(m), tier: tTier(s.tier) })
+      : t('regionNoData', { muscle: tm(m) });
   };
 
   return (
@@ -185,7 +185,7 @@ export function MuscleOverview({
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <SectionLabel>{t('selectedMuscle')}</SectionLabel>
-                  <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4 }}>{MUSCLE_LABEL[selected]}</div>
+                  <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4 }}>{tm(selected)}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <Mono style={{ fontSize: 26, fontWeight: 700, color: 'var(--accent-text)' }}>{Math.round(info.fatigue * 100)}%</Mono>
@@ -246,13 +246,14 @@ function StrengthDetail({
 }) {
   const t = useTranslations('muscles');
   const tTier = useTranslations('strengthTier');
+  const tm = useTranslations('muscleNames');
   const standard = MUSCLE_STANDARD[muscle];
 
   if (!str) {
     return (
       <div>
         <SectionLabel>{t('selectedMuscle')}</SectionLabel>
-        <div style={{ fontSize: 20, fontWeight: 700, margin: '4px 0 10px' }}>{MUSCLE_LABEL[muscle]}</div>
+        <div style={{ fontSize: 20, fontWeight: 700, margin: '4px 0 10px' }}>{tm(muscle)}</div>
         <div style={{ fontSize: 14, color: 'var(--text-2)', lineHeight: 1.5 }}>
           {!standard
             ? t('noStandard')
@@ -284,7 +285,7 @@ function StrengthDetail({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div>
           <SectionLabel>{t('selectedMuscle')}</SectionLabel>
-          <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4 }}>{MUSCLE_LABEL[muscle]}</div>
+          <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4 }}>{tm(muscle)}</div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--accent-text)', letterSpacing: '-.01em' }}>{tTier(str.tier)}</div>

@@ -3,6 +3,7 @@ import type { Sex } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { MUSCLES, type Muscle } from '@/domain/muscles/taxonomy';
 import { classifyStrength, type StrengthTier } from '@/domain/strength/standards';
+import { exName } from '@/lib/i18n/exercise';
 
 export interface MuscleStrength {
   /** Best estimated 1RM (kg) on a PRIMARY exercise for this muscle. */
@@ -42,15 +43,17 @@ async function latestBodyweightKg(userId: string): Promise<number | null> {
 export async function computeMuscleStrength(
   userId: string,
   sex: Sex,
+  locale = 'en',
 ): Promise<{ bodyweightKg: number | null; byMuscle: Partial<Record<Muscle, MuscleStrength>> }> {
   const bodyweightKg = await latestBodyweightKg(userId);
   const byMuscle: Partial<Record<Muscle, MuscleStrength>> = {};
   if (!bodyweightKg || bodyweightKg <= 0) return { bodyweightKg, byMuscle };
 
-  // Best EST_1RM per exercise, with the exercise's PRIMARY muscle links.
+  // Best EST_1RM per exercise, with the exercise's PRIMARY muscle links. nameDe is
+  // fetched so the contributing lift renders in the viewer's locale.
   const prs = await prisma.personalRecord.findMany({
     where: { ownerId: userId, kind: 'EST_1RM' },
-    include: { exercise: { select: { name: true, muscleLinks: { where: { role: 'PRIMARY' } } } } },
+    include: { exercise: { select: { name: true, nameDe: true, muscleLinks: { where: { role: 'PRIMARY' } } } } },
   });
 
   // For each muscle, find the max 1RM among its primary exercises.
@@ -59,7 +62,7 @@ export async function computeMuscleStrength(
     for (const link of pr.exercise.muscleLinks) {
       const m = link.muscle as Muscle;
       const cur = best[m];
-      if (!cur || pr.value > cur.value) best[m] = { value: pr.value, lift: pr.exercise.name };
+      if (!cur || pr.value > cur.value) best[m] = { value: pr.value, lift: exName(pr.exercise, locale) };
     }
   }
 

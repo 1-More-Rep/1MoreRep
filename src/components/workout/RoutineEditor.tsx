@@ -94,8 +94,8 @@ export function RoutineEditor({ routineId, items }: { routineId: string; items: 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
-      <SectionLabel>Exercises ({items.length})</SectionLabel>
-      {items.length === 0 && <Card soft><span style={{ color: 'var(--text-3)' }}>Add exercises below.</span></Card>}
+      <SectionLabel>{t('exercisesHeading', { count: items.length })}</SectionLabel>
+      {items.length === 0 && <Card soft><span style={{ color: 'var(--text-3)' }}>{t('addExercisesHint')}</span></Card>}
       {items.map((it, index) => {
         const inSuperset = it.supersetGroup != null;
         const firstOfGroup = inSuperset && (index === 0 || items[index - 1]!.supersetGroup !== it.supersetGroup);
@@ -103,7 +103,7 @@ export function RoutineEditor({ routineId, items }: { routineId: string; items: 
           <div key={it.id}>
             {firstOfGroup && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '0 0 6px 4px', fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--accent-text)' }}>
-                <Icon name="repeat" size={13} stroke={2} /> Superset
+                <Icon name="repeat" size={13} stroke={2} /> {t('supersetBadge')}
               </div>
             )}
             <Card style={inSuperset ? { borderLeft: '3px solid var(--accent)' } : undefined}>
@@ -111,32 +111,32 @@ export function RoutineEditor({ routineId, items }: { routineId: string; items: 
                 {/* Row 1: exercise name + reorder/superset/remove actions */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600 }}>{it.exerciseName}</div>
-                  <button onClick={() => move(index, -1)} disabled={index === 0} aria-label={`Move ${it.exerciseName} up`} style={{ ...iconBtn, opacity: index === 0 ? 0.4 : 1 }}>
+                  <button onClick={() => move(index, -1)} disabled={index === 0} aria-label={t('moveUp', { name: it.exerciseName })} style={{ ...iconBtn, opacity: index === 0 ? 0.4 : 1 }}>
                     <Icon name="arrowUp" size={15} />
                   </button>
-                  <button onClick={() => move(index, 1)} disabled={index === items.length - 1} aria-label={`Move ${it.exerciseName} down`} style={{ ...iconBtn, opacity: index === items.length - 1 ? 0.4 : 1, transform: 'rotate(180deg)' }}>
+                  <button onClick={() => move(index, 1)} disabled={index === items.length - 1} aria-label={t('moveDown', { name: it.exerciseName })} style={{ ...iconBtn, opacity: index === items.length - 1 ? 0.4 : 1, transform: 'rotate(180deg)' }}>
                     <Icon name="arrowUp" size={15} />
                   </button>
-                  <button onClick={() => toggleSuperset(index)} aria-label={inSuperset ? `Clear superset on ${it.exerciseName}` : `Superset ${it.exerciseName}`} aria-pressed={inSuperset} style={{ ...iconBtn, color: inSuperset ? 'var(--accent-text)' : 'var(--text-3)', borderColor: inSuperset ? 'var(--accent-line)' : 'var(--line-2)' }}>
+                  <button onClick={() => toggleSuperset(index)} aria-label={inSuperset ? t('clearSuperset', { name: it.exerciseName }) : t('supersetExercise', { name: it.exerciseName })} aria-pressed={inSuperset} style={{ ...iconBtn, color: inSuperset ? 'var(--accent-text)' : 'var(--text-3)', borderColor: inSuperset ? 'var(--accent-line)' : 'var(--line-2)' }}>
                     <Icon name="repeat" size={15} />
                   </button>
-                  <button onClick={() => remove(it.id)} aria-label={`Remove ${it.exerciseName}`} style={iconBtn}>
+                  <button onClick={() => remove(it.id)} aria-label={t('removeExercise', { name: it.exerciseName })} style={iconBtn}>
                     <Icon name="x" size={16} />
                   </button>
                 </div>
                 {/* Row 2: target scheme as a labeled grid (wraps cleanly on phones) */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, maxWidth: 340 }}>
-                  <NumberField label="Sets" value={it.targetSets} onCommit={(v) => update(it.id, { targetSets: v })} />
-                  <NumberField label="Rep ↓" value={it.targetRepLow} onCommit={(v) => update(it.id, { targetRepLow: v })} />
-                  <NumberField label="Rep ↑" value={it.targetRepHigh} onCommit={(v) => update(it.id, { targetRepHigh: v })} />
-                  <NumberField label="Rest s" value={it.targetRestSec} onCommit={(v) => update(it.id, { targetRestSec: v })} />
+                  <NumberField label={t('setsCol')} value={it.targetSets} onCommit={(v) => update(it.id, { targetSets: v })} />
+                  <NumberField label={t('repLowCol')} value={it.targetRepLow} onCommit={(v) => update(it.id, { targetRepLow: v })} />
+                  <NumberField label={t('repHighCol')} value={it.targetRepHigh} onCommit={(v) => update(it.id, { targetRepHigh: v })} />
+                  <NumberField label={t('restCol')} value={it.targetRestSec} onCommit={(v) => update(it.id, { targetRestSec: v })} />
                 </div>
               </div>
             </Card>
           </div>
         );
       })}
-      <ExercisePicker onAdd={add} label="Add exercise" />
+      <ExercisePicker onAdd={add} label={t('addExercise')} />
     </div>
   );
 }

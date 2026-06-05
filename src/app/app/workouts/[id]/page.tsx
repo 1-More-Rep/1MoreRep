@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getLocale } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { exName } from '@/lib/i18n/exercise';
 import { getRoutine } from '@/server/queries/routines';
@@ -18,6 +18,7 @@ type GoalValue = '' | 'HYPERTROPHY' | 'STRENGTH' | 'ENDURANCE' | 'GENERAL';
 export default async function RoutineEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   const locale = await getLocale();
+  const t = await getTranslations('routine');
   const { id } = await params;
   const routine = await getRoutine(id, user.id);
   if (!routine) notFound();
@@ -25,9 +26,9 @@ export default async function RoutineEditorPage({ params }: { params: Promise<{ 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--gap)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <Link href="/app/workouts" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← Workouts</Link>
+        <Link href="/app/workouts" style={{ fontSize: 13, color: 'var(--text-3)', textDecoration: 'none' }}>← {t('backToWorkouts')}</Link>
         <form action={startWorkoutAction.bind(null, routine.id)}>
-          <Btn type="submit" icon="play">Start workout</Btn>
+          <Btn type="submit" icon="play">{t('startWorkout')}</Btn>
         </form>
       </div>
 

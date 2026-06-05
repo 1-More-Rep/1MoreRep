@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function JoinInvitePage({ params }: { params: Promise<{ code: string }> }) {
   const t = await getTranslations('invite');
+  const te = await getTranslations('socialErr');
   const user = await requireUser();
   const { code } = await params;
   // Read-only peek — accepting happens on an explicit button press, not on GET.
@@ -36,7 +37,7 @@ export default async function JoinInvitePage({ params }: { params: Promise<{ cod
             >
               <Icon name="x" size={24} stroke={2} />
             </span>
-            <div style={{ fontSize: 16, fontWeight: 600 }}>{invite.error}</div>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>{te(invite.error)}</div>
           </div>
         ) : invite.self ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center' }}>

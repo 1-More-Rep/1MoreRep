@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { useTranslations } from 'next-intl';
 import { createCustomExerciseAction, type ExerciseFormState } from '@/server/actions/exercises';
-import { MUSCLES, MUSCLE_LABEL } from '@/domain/muscles/taxonomy';
+import { MUSCLES } from '@/domain/muscles/taxonomy';
 import { Btn } from '@/components/ui/Btn';
 import { Alert, TextField } from '@/components/auth/ui';
 
@@ -11,6 +11,7 @@ const EQUIPMENT = ['BARBELL', 'DUMBBELL', 'MACHINE', 'CABLE', 'BODYWEIGHT', 'KET
 
 export function CreateExerciseForm() {
   const t = useTranslations('exercises');
+  const tm = useTranslations('muscleNames');
   const [state, action] = useActionState(createCustomExerciseAction, {} as ExerciseFormState);
   return (
     <form action={action} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -35,14 +36,14 @@ export function CreateExerciseForm() {
       <Field label={t('primaryMuscle')}>
         <select name="primaryMuscle" defaultValue="CHEST" style={sel}>
           {MUSCLES.map((m) => (
-            <option key={m} value={m}>{MUSCLE_LABEL[m]}</option>
+            <option key={m} value={m}>{tm(m)}</option>
           ))}
         </select>
       </Field>
       <Field label={t('secondaryMuscles')}>
         <select name="secondaryMuscles" multiple size={6} style={{ ...sel, height: 'auto', padding: 8 }}>
           {MUSCLES.map((m) => (
-            <option key={m} value={m}>{MUSCLE_LABEL[m]}</option>
+            <option key={m} value={m}>{tm(m)}</option>
           ))}
         </select>
       </Field>

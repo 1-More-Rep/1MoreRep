@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --force) FORCE=1 ;;
     -h|--help)
-      sed -n '2,28p' "$SELF" | sed 's/^# \{0,1\}//'
+      sed -n '2,21p' "$SELF" | sed 's/^# \{0,1\}//'
       exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac

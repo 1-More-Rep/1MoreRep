@@ -58,12 +58,14 @@ export function ThemeProvider({
   children: React.ReactNode;
   initial?: Partial<ThemeTweaks>;
 }) {
-  const [tweaks, setState] = useState<ThemeTweaks>(() => normalize({ ...initial }));
-
-  // Hydrate from localStorage on mount (account-saved prefs are applied by AppearanceSync).
-  useEffect(() => {
-    setState(readStored());
-  }, []);
+  // Lazy-init from localStorage on the client (DEFAULT on the server). We do NOT
+  // re-apply localStorage in a mount effect: AppearanceSync (a descendant) applies
+  // the account-saved theme in its own mount effect, and child effects run before
+  // this parent's — a parent setState(readStored()) here would clobber the account
+  // value and break cross-device theming. The account is the source of truth.
+  const [tweaks, setState] = useState<ThemeTweaks>(() =>
+    typeof window === 'undefined' ? normalize({ ...initial }) : readStored(),
+  );
 
   // Persist + apply whenever tweaks change.
   useEffect(() => {

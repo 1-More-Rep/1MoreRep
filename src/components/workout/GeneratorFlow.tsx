@@ -14,7 +14,6 @@ import {
   type GenInputs,
 } from '@/server/actions/generator';
 import type { GenGoal } from '@/domain/generator/types';
-import { MUSCLE_LABEL } from '@/domain/muscles/taxonomy';
 import { formatWeight, weightUnit, type UnitSystemLike } from '@/domain/units';
 import { Card } from '@/components/ui/Card';
 import { Btn } from '@/components/ui/Btn';
@@ -28,6 +27,7 @@ const EQUIP: Equipment[] = ['BARBELL', 'DUMBBELL', 'MACHINE', 'CABLE', 'BODYWEIG
 
 export function GeneratorFlow({ initialGoal, unitSystem }: { initialGoal?: GenGoal; unitSystem: UnitSystemLike }) {
   const t = useTranslations('workout');
+  const tm = useTranslations('muscleNames');
   const [goal, setGoal] = useState<GenGoal>(initialGoal ?? 'HYPERTROPHY');
   const [time, setTime] = useState(60);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
@@ -108,7 +108,7 @@ export function GeneratorFlow({ initialGoal, unitSystem }: { initialGoal?: GenGo
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 600 }}>{ex.name}</div>
                 <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>
-                  {MUSCLE_LABEL[ex.primaryMuscle]}{ex.supersetGroup != null ? ` · ${t('supersetSuffix')}` : ''}
+                  {tm(ex.primaryMuscle)}{ex.supersetGroup != null ? ` · ${t('supersetSuffix')}` : ''}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
