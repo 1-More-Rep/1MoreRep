@@ -8,6 +8,8 @@ import {
   IBM_Plex_Mono,
 } from 'next/font/google';
 import { headers } from 'next/headers';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
 import './globals.css';
 import { ThemeProvider, themeBootScript } from '@/components/theme/ThemeProvider';
 import { ToastProvider } from '@/components/ui';
@@ -46,6 +48,8 @@ export async function generateViewport(): Promise<Viewport> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const nonce = (await headers()).get('x-nonce') ?? undefined;
+  const locale = await getLocale();
+  const messages = await getMessages();
   return (
     // suppressHydrationWarning: themeBootScript (below) mutates data-theme / data-icon-style
     // on <html> before React hydrates, to honor the stored preference without a flash. That
@@ -53,15 +57,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // would otherwise raise on every route. We intentionally DON'T hardcode data-theme here:
     // the boot script sets it for JS clients (stored or system-resolved), and a
     // prefers-color-scheme fallback in globals.css covers no-JS. (Scoped to <html> attrs.)
-    <html lang="en" data-icon-style="soft" className={fontVars} suppressHydrationWarning>
+    <html lang={locale} data-icon-style="soft" className={fontVars} suppressHydrationWarning>
       <head>
         {/* Apply stored/system theme before first paint to avoid a flash of the wrong theme. */}
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body>
-        <ThemeProvider>
-          <ToastProvider>{children}</ToastProvider>
-        </ThemeProvider>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <ThemeProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </ThemeProvider>
+        </NextIntlClientProvider>
         <PwaRegister />
       </body>
     </html>

@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Icon } from '@/components/ui/Icon';
 import { MOBILE_TABS, isActive } from './navConfig';
 
 export function MobileTabBar() {
   const pathname = usePathname();
+  const t = useTranslations('nav');
   return (
     <nav
       aria-label="Primary"
@@ -25,7 +27,7 @@ export function MobileTabBar() {
             <Link
               key="add"
               href="/app/workout/new"
-              aria-label="New workout"
+              aria-label={t('newWorkout')}
               style={{
                 width: 50,
                 height: 50,
@@ -78,7 +80,7 @@ export function MobileTabBar() {
             >
               <Icon name={it.icon} size={22} stroke={active ? 2.2 : 1.8} />
             </span>
-            <span style={{ fontSize: 10.5, fontWeight: active ? 600 : 500 }}>{it.label}</span>
+            <span style={{ fontSize: 10.5, fontWeight: active ? 600 : 500 }}>{t(it.id)}</span>
           </Link>
         );
       })}

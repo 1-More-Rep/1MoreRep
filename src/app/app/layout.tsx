@@ -3,6 +3,7 @@ import { AppShell } from '@/components/nav/AppShell';
 import { requireUser, hasRole } from '@/lib/auth/guards';
 import { ImpersonationBanner } from '@/components/admin/ImpersonationBanner';
 import { AppearanceSync } from '@/components/theme/AppearanceSync';
+import { LocaleSync } from '@/components/i18n/LocaleSync';
 import { NotificationPrompt } from '@/components/pwa/NotificationPrompt';
 import { getSettings } from '@/lib/settings';
 import type { ThemeTweaks } from '@/lib/theme/tokens';
@@ -14,6 +15,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <>
       <AppearanceSync saved={saved} />
+      <LocaleSync locale={user.locale} />
       <ImpersonationBanner />
       <AppShell isAdmin={hasRole(user, 'ADMIN')} brandName={settings.brandName}>
         {children}

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { Icon } from '@/components/ui/Icon';
 import { Sheet } from '@/components/ui/Sheet';
 import { MORE_NAV, isActive } from './navConfig';
@@ -10,6 +11,7 @@ import { MORE_NAV, isActive } from './navConfig';
 /** Bottom sheet listing the secondary destinations not on the bottom tab bar. */
 export function MoreMenuSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const t = useTranslations('nav');
 
   // Close the sheet whenever the route changes (after a link is tapped).
   useEffect(() => {
@@ -18,7 +20,7 @@ export function MoreMenuSheet({ open, onClose }: { open: boolean; onClose: () =>
   }, [pathname]);
 
   return (
-    <Sheet open={open} onClose={onClose} title="More">
+    <Sheet open={open} onClose={onClose} title={t('more')}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {MORE_NAV.map((item) => {
           const active = isActive(pathname, item.href);
@@ -56,7 +58,7 @@ export function MoreMenuSheet({ open, onClose }: { open: boolean; onClose: () =>
               >
                 <Icon name={item.icon} size={20} stroke={1.9} />
               </span>
-              <span style={{ flex: 1, fontSize: 15.5, fontWeight: 600 }}>{item.label}</span>
+              <span style={{ flex: 1, fontSize: 15.5, fontWeight: 600 }}>{t(item.id)}</span>
               <Icon name="chevronR" size={16} stroke={1.8} style={{ color: 'var(--text-3)' }} />
             </Link>
           );

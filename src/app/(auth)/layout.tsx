@@ -1,10 +1,14 @@
 import type { ReactNode } from 'react';
+import { getLocale } from 'next-intl/server';
 import { Icon } from '@/components/ui/Icon';
 import { getSettings } from '@/lib/settings';
+import { LanguageSelector } from '@/components/i18n/LanguageSelector';
+import { DEFAULT_LOCALE, isLocale } from '@/i18n/config';
 
 export default async function AuthLayout({ children }: { children: ReactNode }) {
   const settings = await getSettings().catch(() => null);
   const brand = settings?.brandName ?? '1MoreRep';
+  const locale = await getLocale();
   return (
     <main
       style={{
@@ -48,6 +52,11 @@ export default async function AuthLayout({ children }: { children: ReactNode }) 
         }}
       >
         {children}
+      </div>
+      <div style={{ width: '100%', maxWidth: 400, display: 'flex', justifyContent: 'center' }}>
+        <div style={{ width: 170 }}>
+          <LanguageSelector current={isLocale(locale) ? locale : DEFAULT_LOCALE} />
+        </div>
       </div>
     </main>
   );

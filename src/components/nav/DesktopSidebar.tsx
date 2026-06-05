@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Icon } from '@/components/ui/Icon';
 import { Btn } from '@/components/ui/Btn';
 import { SectionLabel } from '@/components/ui/typography';
@@ -10,6 +11,7 @@ import { SIDEBAR_NAV, isActive } from './navConfig';
 
 export function DesktopSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const t = useTranslations('nav');
   return (
     <nav
       aria-label="Primary"
@@ -53,10 +55,10 @@ export function DesktopSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
       </Link>
 
       <Btn kind="primary" icon="plus" full href="/app/workout/new">
-        New workout
+        {t('newWorkout')}
       </Btn>
 
-      <SectionLabel style={{ marginTop: 4, paddingLeft: 6 }}>Menu</SectionLabel>
+      <SectionLabel style={{ marginTop: 4, paddingLeft: 6 }}>{t('menu')}</SectionLabel>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {SIDEBAR_NAV.map((item) => {
@@ -81,7 +83,7 @@ export function DesktopSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
               }}
             >
               <Icon name={item.icon} size={19} stroke={active ? 2.1 : 1.8} />
-              {item.label}
+              {t(item.id)}
             </Link>
           );
         })}
@@ -103,7 +105,7 @@ export function DesktopSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
             }}
           >
             <Icon name="trophy" size={19} stroke={1.8} />
-            Admin
+            {t('admin')}
           </Link>
         )}
         <Link
@@ -121,7 +123,7 @@ export function DesktopSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
           }}
         >
           <Icon name="user" size={19} stroke={1.8} />
-          Profile
+          {t('profile')}
         </Link>
         <Link
           href="/app/feedback"
@@ -138,7 +140,7 @@ export function DesktopSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
           }}
         >
           <Icon name="megaphone" size={19} stroke={1.8} />
-          Help &amp; feedback
+          {t('feedback')}
         </Link>
         <Link
           href="/app/settings"
@@ -155,7 +157,7 @@ export function DesktopSidebar({ isAdmin = false }: { isAdmin?: boolean }) {
           }}
         >
           <Icon name="settings" size={19} stroke={1.8} />
-          Settings
+          {t('settings')}
         </Link>
         <LogoutButton />
       </div>

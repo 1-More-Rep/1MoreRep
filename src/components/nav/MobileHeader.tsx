@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Icon } from '@/components/ui/Icon';
 import { MoreMenuSheet } from './MoreMenuSheet';
 
@@ -12,6 +13,7 @@ import { MoreMenuSheet } from './MoreMenuSheet';
  */
 export function MobileHeader({ brandName = '1MoreRep' }: { brandName?: string }) {
   const [open, setOpen] = useState(false);
+  const t = useTranslations('nav');
   return (
     <>
       <header
@@ -50,7 +52,7 @@ export function MobileHeader({ brandName = '1MoreRep' }: { brandName?: string })
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label="More"
+          aria-label={t('more')}
           aria-haspopup="dialog"
           style={{
             display: 'inline-flex',
@@ -69,7 +71,7 @@ export function MobileHeader({ brandName = '1MoreRep' }: { brandName?: string })
           }}
         >
           <Icon name="menu" size={18} stroke={2} />
-          More
+          {t('more')}
         </button>
       </header>
       <MoreMenuSheet open={open} onClose={() => setOpen(false)} />
