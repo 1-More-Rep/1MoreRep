@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { getTranslations } from 'next-intl/server';
+import { getTranslations, getLocale } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
+import { exName } from '@/lib/i18n/exercise';
 import { listBodyMetrics } from '@/server/services/bodyMetricService';
 import { getHistory, sessionVolume } from '@/server/queries/sessions';
 import { getExerciseSetHistory, getTopExerciseId, getExercise } from '@/server/queries/exercises';
@@ -25,6 +26,7 @@ const MEASUREMENT_FIELDS: { key: string; labelKey: string }[] = [
 
 export default async function ProgressPage() {
   const t = await getTranslations('progress');
+  const locale = await getLocale();
   const user = await requireUser();
   const [metrics, history, topExerciseId] = await Promise.all([
     listBodyMetrics(user.id),
@@ -50,7 +52,7 @@ export default async function ProgressPage() {
   let oneRm: { exerciseName: string | null; points: ChartPoint[] } = { exerciseName: null, points: [] };
   if (topExerciseId) {
     const [ex, hist] = await Promise.all([getExercise(topExerciseId, user.id), getExerciseSetHistory(topExerciseId, user.id)]);
-    oneRm = { exerciseName: ex?.name ?? null, points: hist.map((p) => ({ label: short(p.at), value: round1(w(p.est1RM)) })) };
+    oneRm = { exerciseName: ex ? exName(ex, locale) : null, points: hist.map((p) => ({ label: short(p.at), value: round1(w(p.est1RM)) })) };
   }
 
   // Measurements tab: one series per metric from the BodyMetric.measurements JSON.

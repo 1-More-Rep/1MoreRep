@@ -1,11 +1,13 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { getLocale } from 'next-intl/server';
 import { z } from 'zod';
 import type { Equipment, Mechanic, Muscle, MuscleRole } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { requireUser } from '@/lib/auth/guards';
 import { searchExercises } from '@/server/queries/exercises';
+import { exName } from '@/lib/i18n/exercise';
 import { MUSCLES } from '@/domain/muscles/taxonomy';
 import { iconForEquipment } from '../../../prisma/seed/muscleMap';
 
@@ -23,8 +25,10 @@ export interface PickerExercise {
 /** Lightweight exercise search for the add-exercise picker. */
 export async function searchExercisesAction(q: string): Promise<PickerExercise[]> {
   const user = await requireUser();
+  const locale = await getLocale();
   const results = await searchExercises({ q: q || undefined, userId: user.id, take: 30 });
-  return results.map((e) => ({ id: e.id, name: e.name, equipment: e.equipment, iconKey: e.iconKey }));
+  // Localize the name at the server boundary so the client picker stays hook-free.
+  return results.map((e) => ({ id: e.id, name: exName(e, locale), equipment: e.equipment, iconKey: e.iconKey }));
 }
 
 const EQUIPMENT = ['BARBELL', 'DUMBBELL', 'MACHINE', 'CABLE', 'BODYWEIGHT', 'KETTLEBELL', 'BAND', 'EZ_BAR', 'BALL', 'OTHER'] as const;

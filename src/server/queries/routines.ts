@@ -5,7 +5,7 @@ export async function listRoutines(userId: string) {
   return prisma.routine.findMany({
     where: { ownerId: userId, isArchived: false },
     orderBy: { updatedAt: 'desc' },
-    include: { _count: { select: { items: true } }, items: { include: { exercise: { select: { name: true } } }, orderBy: { order: 'asc' } } },
+    include: { _count: { select: { items: true } }, items: { include: { exercise: { select: { name: true, nameDe: true } } }, orderBy: { order: 'asc' } } },
   });
 }
 

@@ -1,5 +1,6 @@
-import { getTranslations } from 'next-intl/server';
+import { getTranslations, getLocale } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
+import { exName } from '@/lib/i18n/exercise';
 import { listRoutines } from '@/server/queries/routines';
 import { getActiveSession } from '@/server/queries/sessions';
 import { startWorkoutAction } from '@/server/actions/workout';
@@ -13,6 +14,7 @@ export const dynamic = 'force-dynamic';
 export default async function NewWorkoutPage() {
   const user = await requireUser();
   const t = await getTranslations('workout');
+  const locale = await getLocale();
   const [routines, active] = await Promise.all([listRoutines(user.id), getActiveSession(user.id)]);
 
   return (
@@ -45,7 +47,7 @@ export default async function NewWorkoutPage() {
             <button type="submit" style={{ all: 'unset', display: 'flex', width: '100%', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 16, fontWeight: 700 }}>{r.name}</div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{r.items.slice(0, 4).map((it) => it.exercise.name).join(' · ')}</div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{r.items.slice(0, 4).map((it) => exName(it.exercise, locale)).join(' · ')}</div>
               </div>
               <Mono style={{ fontSize: 13, color: 'var(--text-3)' }}>{t('exerciseCount', { count: r._count.items })}</Mono>
             </button>

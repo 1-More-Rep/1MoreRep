@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getTranslations, getLocale } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { getSessionDetail, sessionVolume, completedSetCount } from '@/server/queries/sessions';
+import { exName } from '@/lib/i18n/exercise';
 import { prisma } from '@/server/db/prisma';
 import { repeatWorkoutAction } from '@/server/actions/workout';
 import { Card } from '@/components/ui/Card';
@@ -24,11 +25,12 @@ const PR_LABEL_KEY: Record<string, string> = {
 
 export default async function SessionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const t = await getTranslations('history');
+  const locale = await getLocale();
   const user = await requireUser();
   const { id } = await params;
   const session = await getSessionDetail(id, user.id);
   if (!session) notFound();
-  const prs = await prisma.personalRecord.findMany({ where: { sessionId: id }, include: { exercise: { select: { name: true } } } });
+  const prs = await prisma.personalRecord.findMany({ where: { sessionId: id }, include: { exercise: { select: { name: true, nameDe: true } } } });
   const entries = session.entries.filter((e) => !e.isRemoved);
 
   return (
@@ -61,7 +63,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {prs.map((p) => (
               <Chip key={p.id} accent>
-                {p.exercise.name}: {PR_LABEL_KEY[p.kind] ? t(PR_LABEL_KEY[p.kind]!) : p.kind} <Mono>{p.value}</Mono>
+                {exName(p.exercise, locale)}: {PR_LABEL_KEY[p.kind] ? t(PR_LABEL_KEY[p.kind]!) : p.kind} <Mono>{p.value}</Mono>
               </Chip>
             ))}
           </div>
@@ -72,7 +74,7 @@ export default async function SessionDetailPage({ params }: { params: Promise<{ 
         <Card key={e.id} pad={false}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 'var(--pad)' }}>
             <IconTile name={e.exercise.iconKey as IconName} variant="soft" size={38} icon={19} />
-            <div style={{ fontSize: 15, fontWeight: 600 }}>{e.exercise.name}</div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>{exName(e.exercise, locale)}</div>
           </div>
           <div>
             {e.sets.filter((s) => s.completed).map((s) => (

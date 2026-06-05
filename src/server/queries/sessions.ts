@@ -5,7 +5,7 @@ const entryInclude = {
   entries: {
     orderBy: { order: 'asc' as const },
     include: {
-      exercise: { select: { id: true, name: true, iconKey: true, equipment: true } },
+      exercise: { select: { id: true, name: true, nameDe: true, iconKey: true, equipment: true } },
       sets: { orderBy: { setIndex: 'asc' as const } },
     },
   },

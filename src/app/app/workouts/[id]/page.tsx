@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { getLocale } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
+import { exName } from '@/lib/i18n/exercise';
 import { getRoutine } from '@/server/queries/routines';
 import { startWorkoutAction } from '@/server/actions/workout';
 import { Btn } from '@/components/ui/Btn';
@@ -15,6 +17,7 @@ type GoalValue = '' | 'HYPERTROPHY' | 'STRENGTH' | 'ENDURANCE' | 'GENERAL';
 
 export default async function RoutineEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
+  const locale = await getLocale();
   const { id } = await params;
   const routine = await getRoutine(id, user.id);
   if (!routine) notFound();
@@ -41,7 +44,7 @@ export default async function RoutineEditorPage({ params }: { params: Promise<{ 
         routineId={routine.id}
         items={routine.items.map((it) => ({
           id: it.id,
-          exerciseName: it.exercise.name,
+          exerciseName: exName(it.exercise, locale),
           supersetGroup: it.supersetGroup,
           targetSets: it.targetSets,
           targetRepLow: it.targetRepLow,

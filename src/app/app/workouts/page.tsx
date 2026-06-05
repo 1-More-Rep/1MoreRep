@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import { getLocale } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
+import { exName } from '@/lib/i18n/exercise';
 import { listRoutines, listArchivedRoutines } from '@/server/queries/routines';
 import { startWorkoutAction } from '@/server/actions/workout';
 import { Card } from '@/components/ui/Card';
@@ -13,6 +15,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function WorkoutsPage() {
   const user = await requireUser();
+  const locale = await getLocale();
   const [routines, archived] = await Promise.all([listRoutines(user.id), listArchivedRoutines(user.id)]);
 
   return (
@@ -43,7 +46,7 @@ export default async function WorkoutsPage() {
                 {r.name}
               </Link>
               <div style={{ fontSize: 12.5, color: 'var(--text-3)', marginTop: 3 }}>
-                {r.items.slice(0, 4).map((it) => it.exercise.name).join(' · ')}
+                {r.items.slice(0, 4).map((it) => exName(it.exercise, locale)).join(' · ')}
                 {r.items.length > 4 ? ` +${r.items.length - 4}` : ''}
               </div>
             </div>

@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getTranslations, getLocale } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { getExercise, getExerciseSetHistory } from '@/server/queries/exercises';
+import { exName, exInstructions } from '@/lib/i18n/exercise';
 import { MUSCLE_LABEL, type Muscle } from '@/domain/muscles/taxonomy';
 import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Chip';
@@ -17,10 +18,13 @@ const short = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 
 
 export default async function ExerciseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const t = await getTranslations('exercises');
+  const locale = await getLocale();
   const user = await requireUser();
   const { id } = await params;
   const ex = await getExercise(id, user.id);
   if (!ex) notFound();
+
+  const instructions = exInstructions(ex, locale);
 
   const links = [...ex.muscleLinks].sort((a, b) => b.weight - a.weight);
   const history = await getExerciseSetHistory(id, user.id);
@@ -37,7 +41,7 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <IconTile name={ex.iconKey as IconName} variant="soft" size={52} icon={26} />
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{ex.name}</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>{exName(ex, locale)}</h1>
           <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
             <Chip>{ex.equipment.toLowerCase().replace('_', ' ')}</Chip>
             {ex.mechanic && <Chip>{ex.mechanic.toLowerCase()}</Chip>}
@@ -104,11 +108,11 @@ export default async function ExerciseDetailPage({ params }: { params: Promise<{
         </div>
       </Card>
 
-      {ex.instructions.length > 0 && (
+      {instructions.length > 0 && (
         <Card>
           <SectionLabel style={{ marginBottom: 14 }}>{t('instructions')}</SectionLabel>
           <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {ex.instructions.map((step, i) => (
+            {instructions.map((step, i) => (
               <li key={i} style={{ fontSize: 14, lineHeight: 1.5, color: 'var(--text-2)' }}>{step}</li>
             ))}
           </ol>

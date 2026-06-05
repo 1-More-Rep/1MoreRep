@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { getTranslations } from 'next-intl/server';
+import { getTranslations, getLocale } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
+import { exName } from '@/lib/i18n/exercise';
 import { prisma } from '@/server/db/prisma';
 import { Card, Chip, Mono, SectionLabel } from '@/components/ui';
 
@@ -16,20 +17,22 @@ const KIND_LABEL_KEY: Record<string, string> = {
 
 export default async function PrsPage() {
   const t = await getTranslations('progress');
+  const locale = await getLocale();
   const user = await requireUser();
   const prs = await prisma.personalRecord.findMany({
     where: { ownerId: user.id },
-    include: { exercise: { select: { name: true } } },
+    include: { exercise: { select: { name: true, nameDe: true } } },
     orderBy: { achievedAt: 'desc' },
     take: 100,
   });
 
-  // group by exercise
+  // group by exercise (localized display name)
   const byExercise = new Map<string, typeof prs>();
   for (const p of prs) {
-    const arr = byExercise.get(p.exercise.name) ?? [];
+    const name = exName(p.exercise, locale);
+    const arr = byExercise.get(name) ?? [];
     arr.push(p);
-    byExercise.set(p.exercise.name, arr);
+    byExercise.set(name, arr);
   }
 
   return (

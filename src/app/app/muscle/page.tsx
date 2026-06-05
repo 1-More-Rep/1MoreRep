@@ -1,5 +1,6 @@
-import { getTranslations } from 'next-intl/server';
+import { getTranslations, getLocale } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
+import { exName } from '@/lib/i18n/exercise';
 import { prisma } from '@/server/db/prisma';
 import { computeAndCacheFatigue } from '@/server/services/fatigueService';
 import { weeklyVolumeByMuscle } from '@/server/services/generatorService';
@@ -12,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function MusclePage() {
   const t = await getTranslations('muscles');
+  const locale = await getLocale();
   const user = await requireUser();
   const fatigue = await computeAndCacheFatigue(user.id);
   const weeklyVolume = await weeklyVolumeByMuscle(user.id, new Date());
@@ -36,7 +38,7 @@ export default async function MusclePage() {
   const ranked: Record<string, { id: string; name: string; weight: number }[]> = {};
   for (const ex of exercises) {
     for (const link of ex.muscleLinks) {
-      (ranked[link.muscle] ??= []).push({ id: ex.id, name: ex.name, weight: link.weight });
+      (ranked[link.muscle] ??= []).push({ id: ex.id, name: exName(ex, locale), weight: link.weight });
     }
   }
   const topExercises: Record<string, { id: string; name: string }[]> = {};

@@ -1,6 +1,8 @@
 import 'server-only';
+import { getLocale } from 'next-intl/server';
 import type { Equipment, ExCategory } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
+import { exName } from '@/lib/i18n/exercise';
 import { AuthorizationError } from '@/lib/auth/guards';
 import { computeAndCacheFatigue } from './fatigueService';
 import { generateWorkout, swapExercise } from '@/domain/generator/engine';
@@ -36,6 +38,7 @@ export async function weeklyVolumeByMuscle(userId: string, now: Date): Promise<R
 }
 
 async function buildPool(userId: string, equipment?: Equipment[]): Promise<PoolExercise[]> {
+  const locale = await getLocale();
   const exercises = await prisma.exercise.findMany({
     where: {
       OR: [{ ownerId: null }, { ownerId: userId }],
@@ -50,7 +53,7 @@ async function buildPool(userId: string, equipment?: Equipment[]): Promise<PoolE
     .map((e) => ({
       id: e.id,
       slug: e.slug,
-      name: e.name,
+      name: exName(e, locale),
       mechanic: e.mechanic,
       equipment: e.equipment,
       defaultRestSec: e.defaultRestSec,

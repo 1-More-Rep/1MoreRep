@@ -24,7 +24,7 @@ const fieldBase: CSSProperties = {
   boxSizing: 'border-box',
 };
 
-function Label({ label, htmlFor, hint }: { label?: ReactNode; htmlFor?: string; hint?: ReactNode }) {
+function Label({ label, hint }: { label?: ReactNode; hint?: ReactNode }) {
   if (!label) return null;
   return (
     <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
@@ -44,7 +44,7 @@ export function Input({ label, hint, id, style, ...rest }: InputProps) {
   const fieldId = id ?? auto;
   return (
     <label htmlFor={fieldId} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <Label label={label} htmlFor={fieldId} hint={hint} />
+      <Label label={label} hint={hint} />
       <input id={fieldId} style={{ ...fieldBase, height: 46, ...style }} {...rest} />
     </label>
   );
@@ -60,7 +60,7 @@ export function Textarea({ label, hint, id, style, rows = 4, ...rest }: Textarea
   const fieldId = id ?? auto;
   return (
     <label htmlFor={fieldId} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <Label label={label} htmlFor={fieldId} hint={hint} />
+      <Label label={label} hint={hint} />
       <textarea
         id={fieldId}
         rows={rows}

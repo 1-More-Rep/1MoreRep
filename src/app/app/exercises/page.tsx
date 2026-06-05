@@ -1,7 +1,8 @@
 import Link from 'next/link';
-import { getTranslations } from 'next-intl/server';
+import { getTranslations, getLocale } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { searchExercises } from '@/server/queries/exercises';
+import { exName } from '@/lib/i18n/exercise';
 import { MUSCLE_LABEL } from '@/domain/muscles/taxonomy';
 import type { Muscle, Equipment } from '@prisma/client';
 import { Card } from '@/components/ui/Card';
@@ -20,6 +21,7 @@ export default async function ExercisesPage({
   searchParams: Promise<{ q?: string; muscle?: string; equipment?: string }>;
 }) {
   const t = await getTranslations('exercises');
+  const locale = await getLocale();
   const user = await requireUser();
   const sp = await searchParams;
   const results = await searchExercises({
@@ -63,7 +65,7 @@ export default async function ExercisesPage({
             >
               <IconTile name={ex.iconKey as IconName} variant="soft" size={40} icon={20} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-.01em' }}>{ex.name}</div>
+                <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-.01em' }}>{exName(ex, locale)}</div>
                 <div style={{ fontSize: 12.5, color: 'var(--text-3)' }}>{primaries.join(' · ') || '—'}</div>
               </div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>

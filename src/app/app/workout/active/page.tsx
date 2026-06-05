@@ -1,12 +1,15 @@
 import { redirect } from 'next/navigation';
+import { getLocale } from 'next-intl/server';
 import { requireUser } from '@/lib/auth/guards';
 import { getActiveSession } from '@/server/queries/sessions';
+import { exName } from '@/lib/i18n/exercise';
 import { ActiveWorkout, type ActiveSessionData } from '@/components/workout/ActiveWorkout';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ActiveWorkoutPage() {
   const user = await requireUser();
+  const locale = await getLocale();
   const session = await getActiveSession(user.id);
   if (!session) redirect('/app/workout/new');
 
@@ -20,7 +23,7 @@ export default async function ActiveWorkoutPage() {
       .map((e) => ({
         id: e.id,
         exerciseId: e.exerciseId,
-        exerciseName: e.exercise.name,
+        exerciseName: exName(e.exercise, locale),
         iconKey: e.exercise.iconKey,
         supersetGroup: e.supersetGroup,
         targetSets: e.targetSets,
