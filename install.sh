@@ -117,7 +117,6 @@ else
     const vapidPublic = Buffer.concat([Buffer.from([4]), x, y]).toString("base64url");
     console.log(JSON.stringify({
       APP_KEY: c.randomBytes(32).toString("base64"),
-      SESSION_SECRET: c.randomBytes(32).toString("base64"),
       POSTGRES_PASSWORD: c.randomBytes(18).toString("base64url"),
       JOB_SECRET: c.randomBytes(24).toString("base64url"),
       VAPID_PUBLIC_KEY: vapidPublic,
@@ -164,7 +163,6 @@ POSTGRES_PASSWORD=$(get POSTGRES_PASSWORD)
 POSTGRES_DB=onemorerep
 
 APP_KEY=$(get APP_KEY)
-SESSION_SECRET=$(get SESSION_SECRET)
 JOB_SECRET=$(get JOB_SECRET)
 
 VAPID_PUBLIC_KEY=$(get VAPID_PUBLIC_KEY)
