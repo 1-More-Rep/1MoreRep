@@ -271,9 +271,6 @@ new deploy logic runs, never the stale one); rebuilds the image; recreates the s
 (migrations + seed apply on boot); then polls `/api/health`. Your secrets in `.env` are
 gitignored and preserved across updates.
 
-> `upgrade.sh` is a deprecated alias kept for muscle memory — it just forwards to
-> `update.sh`.
-
 For a checkout cloned over HTTPS, a plain `git pull` before `./update.sh --force` also
 works if you'd rather pull manually.
 
