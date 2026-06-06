@@ -148,6 +148,24 @@ else
       ;;
   esac
 
+  # Let the operator choose which host interface the app port binds to. Default is the
+  # value chosen above (loopback when Caddy fronts TLS, all-interfaces otherwise). Pick
+  # 0.0.0.0 to expose it on all interfaces (e.g. when fronting with your own external
+  # proxy), or 127.0.0.1 to keep it loopback-only.
+  if [ -t 0 ]; then
+    while :; do
+      read -r -p "Host interface to bind the app port to (0.0.0.0 = all, 127.0.0.1 = loopback) [${APP_BIND}]: " APP_BIND_IN
+      APP_BIND="${APP_BIND_IN:-$APP_BIND}"
+      case "$APP_BIND" in
+        ''|*[!0-9.]*) err "Enter an IPv4 address, e.g. 0.0.0.0 or 127.0.0.1."; continue ;;
+      esac
+      break
+    done
+    if [ -n "$COMPOSE_PROFILES" ] && [ "$APP_BIND" != "127.0.0.1" ]; then
+      log "Note: APP_BIND=${APP_BIND} exposes the plaintext app port on that interface even though Caddy terminates TLS — firewall it, or use 127.0.0.1 to keep it loopback-only."
+    fi
+  fi
+
   umask 077
   cat > .env <<EOF
 NODE_ENV=production
