@@ -179,6 +179,33 @@ fi
 log "Building images (this can take a few minutes)…"
 docker compose build
 
+# Read DB creds back from .env (present in both fresh-install and upgrade paths).
+DB_USER="$(sed -n 's/^POSTGRES_USER=//p' .env | head -n1)"
+DB_PASS="$(sed -n 's/^POSTGRES_PASSWORD=//p' .env | head -n1)"
+DB_NAME="$(sed -n 's/^POSTGRES_DB=//p' .env | head -n1)"
+
+# Start Postgres first and force its role password to match .env BEFORE the app boots.
+# Postgres only applies POSTGRES_PASSWORD when it initializes an EMPTY data directory, so
+# a re-install over an existing db_data volume (same compose project name) that was first
+# created with a different password leaves the app unable to authenticate — an endless
+# "P1000: Authentication failed" restart loop. Reconciling the role password here makes
+# re-installs idempotent; it's a harmless no-op on a freshly-initialized volume.
+log "Starting database…"
+docker compose up -d db
+log "Waiting for the database to accept connections…"
+for i in $(seq 1 30); do
+  docker compose exec -T db pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 2>&1 && break
+  sleep 2
+  [ "$i" = "30" ] && { err "Database did not become ready. Check: docker compose logs db"; exit 1; }
+done
+if [ -n "$DB_PASS" ]; then
+  log "Reconciling database credentials…"
+  DB_PASS_SQL="$(printf '%s' "$DB_PASS" | sed "s/'/''/g")"   # SQL-escape single quotes
+  docker compose exec -T db psql -U "$DB_USER" -d "$DB_NAME" \
+    -c "ALTER USER \"$DB_USER\" WITH PASSWORD '${DB_PASS_SQL}';" >/dev/null 2>&1 \
+    || err "Could not reconcile the DB password automatically; if the app logs show P1000, re-run ./install.sh."
+fi
+
 log "Starting services…"
 # UTC with explicit 'Z' — docker parses a zoneless --since as *local* time, which
 # on a non-UTC host would reach back past this boot and re-print old credentials.
