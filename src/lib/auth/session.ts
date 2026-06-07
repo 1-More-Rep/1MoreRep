@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import type { User } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
@@ -62,8 +63,12 @@ export interface SessionUser {
   impersonatorId: string | null;
 }
 
-/** Validate the request's session cookie; returns the user or null. */
-export async function validateSession(): Promise<SessionUser | null> {
+/**
+ * Validate the request's session cookie; returns the user or null. Memoized per
+ * request with React `cache()` so the layout, guards and multiple server actions in
+ * one request share a single session lookup (and a single throttled idle-roll write).
+ */
+export const validateSession = cache(async (): Promise<SessionUser | null> => {
   const store = await cookies();
   const raw = store.get(SESSION_COOKIE)?.value;
   if (!raw) return null;
@@ -97,7 +102,7 @@ export async function validateSession(): Promise<SessionUser | null> {
   }
 
   return { sessionId: id, user: session.user, impersonatorId: session.impersonatorId };
-}
+});
 
 /** Delete the current session and clear the cookie. */
 export async function destroyCurrentSession(): Promise<void> {

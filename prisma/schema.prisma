@@ -86,6 +86,17 @@ model User {
   lockedUntil        DateTime?
   pendingEmail       String? // set during EMAIL_CHANGE, promoted on confirm
 
+  // Two-factor auth (TOTP authenticator app). The secret is AES-GCM encrypted at
+  // rest and only set once 2FA is actually enabled, so the invariant holds:
+  // totpEnabledAt non-null ⟺ totpSecretEnc non-null ⟺ TOTP active. Passkeys
+  // (WebAuthnCredential) are a separate, passwordless factor.
+  totpSecretEnc String?
+  totpEnabledAt DateTime?
+  // RFC 6238 §5.2 replay defence: the last accepted TOTP time-step. A code is only
+  // honoured if its step is strictly greater, so a code cannot be reused within its
+  // drift window. Null until the first successful verification.
+  totpLastUsedStep BigInt?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   lastLoginAt DateTime?
@@ -122,6 +133,8 @@ model User {
   invitesCreated       InviteLink[]
   leaderboardSnapshots LeaderboardSnapshot[]
   feedback             Feedback[]
+  webAuthnCredentials  WebAuthnCredential[]
+  backupCodes          BackupCode[]
 
   @@index([role])
   @@index([status])
@@ -160,6 +173,41 @@ model AuthToken {
 
   @@index([userId, type])
   @@index([expiresAt])
+}
+
+/// A registered WebAuthn passkey (platform or roaming authenticator). Enables
+/// phishing-resistant, passwordless sign-in. The public key + counter are all
+/// that's stored server-side; the private key never leaves the user's device.
+model WebAuthnCredential {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String    @unique // base64url credential ID
+  publicKey    Bytes // COSE-encoded public key
+  counter      BigInt    @default(0) // signature counter, for clone detection
+  transports   String[]  @default([]) // 'internal' | 'usb' | 'ble' | 'nfc' | 'hybrid'
+  deviceType   String? // 'singleDevice' | 'multiDevice'
+  backedUp     Boolean   @default(false)
+  name         String? // user-supplied label, e.g. "iPhone"
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  @@index([userId])
+}
+
+/// Single-use recovery codes for TOTP 2FA — stored hashed (sha256), shown to the
+/// user exactly once at enrollment. Let a user back in if they lose their phone.
+model BackupCode {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String // sha256(normalized code)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  // The login fallback claims a code by (userId, codeHash); index both so it's a
+  // direct lookup instead of scanning every code for the user.
+  @@index([userId, codeHash])
 }
 
 /// Single-row (id = 1) instance configuration. Secrets stored AES-256-GCM encrypted.
@@ -413,6 +461,12 @@ model WorkoutSession {
   name           String?
   startedAt      DateTime       @default(now())
   completedAt    DateTime?
+  // Set (atomically) when the XP/streak award for this completed workout has been
+  // applied. Doubles as the idempotency anchor (the award runs at most once, even for
+  // zero-XP workouts that create no XpEvent) and the signal for the award.reconcile
+  // job, which re-awards any COMPLETED session left with a null awardedAt after a
+  // crash/transient failure between completion and the award write.
+  awardedAt      DateTime?
   durationSec    Int?
   bodyweightKg   Float?
   notes          String?
@@ -423,6 +477,8 @@ model WorkoutSession {
   @@index([ownerId, startedAt])
   // History/streak queries filter on (ownerId, completedAt) for COMPLETED sessions.
   @@index([ownerId, completedAt])
+  // award.reconcile scans for COMPLETED sessions still missing their award.
+  @@index([status, awardedAt])
   // FK lookup for routine delete / SetNull cascade.
   @@index([routineId])
 }
@@ -656,6 +712,18 @@ model JobRun {
   detail     Json?
 
   @@unique([job, periodKey])
+}
+
+/// Persistent fixed-window rate-limit counters for the security-sensitive limiters
+/// (login/2FA/email). Backing these in the DB instead of process memory means the
+/// brute-force budget is NOT reset by a container restart (every `./update.sh`).
+/// One row per (limiter key, window); expired rows are GC'd by the award.reconcile job.
+model RateLimit {
+  key       String   @id // "<limiter>:<subject>", e.g. "auth:login:1.2.3.4:user@example.com"
+  count     Int      @default(0)
+  expiresAt DateTime // end of the current fixed window
+
+  @@index([expiresAt]) // cheap expired-row sweep
 }
 
 // ---------------------------------------------------------------------------

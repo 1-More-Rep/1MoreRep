@@ -6,8 +6,9 @@ import { settleLeagues } from './leagueSettle';
 import { streakRollover } from './streakRollover';
 import { streakRiskNotify } from './streakRiskNotify';
 import { refreshLeaderboards } from './leaderboardRefresh';
+import { reconcileAwards } from './awardReconcile';
 
-export const JOB_NAMES = ['streak.rollover', 'league.settle', 'leaderboard.refresh', 'streak.risk.notify'] as const;
+export const JOB_NAMES = ['streak.rollover', 'league.settle', 'leaderboard.refresh', 'streak.risk.notify', 'award.reconcile'] as const;
 export type JobName = (typeof JOB_NAMES)[number];
 
 /** Settle any past (already-ended) league weeks that are still ACTIVE. */
@@ -62,6 +63,8 @@ export async function runJob(name: string, now: Date = new Date()): Promise<unkn
       return withJobRun(name, now, () => refreshLeaderboards(now));
     case 'streak.risk.notify':
       return withJobRun(name, now, () => streakRiskNotify(now));
+    case 'award.reconcile':
+      return withJobRun(name, now, () => reconcileAwards(now));
     default:
       throw new Error(`unknown job: ${name}`);
   }

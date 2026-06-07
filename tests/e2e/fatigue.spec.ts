@@ -9,15 +9,17 @@ test.describe('P6 muscle map', () => {
     await expect(page.getByRole('heading', { name: 'Recovery' })).toBeVisible();
     await expect(page.locator('svg[aria-label*="view"]')).toBeVisible();
 
-    // tap a muscle region (front view shows Chest)
-    await page.getByRole('button', { name: /Chest, \d+% fatigued/ }).first().click();
+    // Tap a muscle region (front view shows Chest). Each region is hit-tested on
+    // its painted shape (not the bounding box), so click the visible pec, not the
+    // group's geometric center — which falls in the gap between the two pecs.
+    await page.getByRole('button', { name: /Chest, \d+% fatigued/ }).first().locator('rect').first().click();
     await expect(page.getByTestId('muscle-detail')).toBeVisible();
     await expect(page.getByTestId('muscle-detail').getByText('Chest', { exact: true })).toBeVisible();
   });
 
   test('can switch to the back view', async ({ page }) => {
     await page.goto('/app/muscle');
-    await page.getByRole('button', { name: 'Back', exact: true }).click();
+    await page.getByRole('tab', { name: 'Back', exact: true }).click();
     await expect(page.getByRole('button', { name: /Lats, \d+% fatigued/ }).first()).toBeVisible();
   });
 
@@ -62,7 +64,8 @@ test.describe('P6 muscle map', () => {
 
     // Drive fatigue on this muscle: select it and report high soreness, which
     // recomputes fatigue and tints the region away from the default surface.
-    await biceps.click();
+    // Click the painted arm shape (the group center sits over the torso).
+    await biceps.locator('rect').first().click();
     await page.getByTestId('muscle-detail').getByRole('button', { name: '10', exact: true }).click();
 
     // The page revalidates after logging soreness; wait for the tint to apply.

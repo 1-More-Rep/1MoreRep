@@ -2,8 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { getTranslations } from 'next-intl/server';
 import { z } from 'zod';
-import type { Role } from '@prisma/client';
+import { Prisma, type Role } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { requireRole } from '@/lib/auth/guards';
 import { createSession, destroyAllSessions, destroyCurrentSession, validateSession } from '@/lib/auth/session';
@@ -49,28 +50,34 @@ export interface AdminState {
   models?: string[];
 }
 
-async function activeSuperadminCount(): Promise<number> {
+async function activeSuperadminCount(tx: Prisma.TransactionClient = prisma): Promise<number> {
   // Only ACTIVE superadmins can actually sign in and administer the instance. Counting
   // INVITED ones (who have never accepted their invite and cannot authenticate) would let
   // the last-superadmin guard be satisfied by a phantom, allowing the only usable
   // superadmin to be deactivated/demoted — locking the instance out of superadmin access.
-  return prisma.user.count({ where: { role: 'SUPERADMIN', status: 'ACTIVE' } });
+  return tx.user.count({ where: { role: 'SUPERADMIN', status: 'ACTIVE' } });
+}
+
+function isWriteConflict(e: unknown): boolean {
+  // P2034: transaction failed due to a write conflict / deadlock under SERIALIZABLE.
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2034';
 }
 
 /** Invite a user by email (sends an INVITE magic link). */
 export async function inviteUserAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const actor = await requireRole('ADMIN');
+  const t = await getTranslations('adminErr');
   const emailParsed = emailSchema.safeParse(formData.get('email'));
-  if (!emailParsed.success) return { error: 'Enter a valid email.' };
+  if (!emailParsed.success) return { error: t('invalidEmail') };
   const role = parseRole(formData.get('role'));
-  if (!role) return { error: 'Invalid role.' };
+  if (!role) return { error: t('invalidRole') };
 
   const policy = canInvite(actor, role);
-  if (!policy.ok) return { error: policy.reason };
+  if (!policy.ok) return { error: t(policy.code!) };
 
   const email = emailParsed.data;
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) return { error: 'A user with that email already exists.' };
+  if (existing) return { error: t('emailExists') };
 
   const ctx = await getRequestContext();
   const user = await prisma.user.create({
@@ -91,60 +98,96 @@ export async function inviteUserAction(_prev: AdminState, formData: FormData): P
     await sendMagicLink('INVITE', email, url);
   } catch (err) {
     logger.error({ err, email }, '[admin] invite email failed to send');
-    return { ok: true, notice: `User created, but the invite email could not be sent — check SMTP settings, then use Reset to resend.` };
+    return { ok: true, notice: t('inviteCreatedEmailFailed') };
   }
-  return { ok: true, notice: `Invitation sent to ${email}.` };
+  return { ok: true, notice: t('invitationSent', { email }) };
 }
 
 export async function setRoleAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const actor = await requireRole('ADMIN');
+  const t = await getTranslations('adminErr');
   const targetId = String(formData.get('targetId') ?? '');
   const newRole = parseRole(formData.get('role'));
-  if (!newRole) return { error: 'Invalid role.' };
-  const target = await prisma.user.findUnique({ where: { id: targetId } });
-  if (!target) return { error: 'User not found.' };
+  if (!newRole) return { error: t('invalidRole') };
 
-  const policy = canChangeRole(actor, target, newRole, await activeSuperadminCount());
-  if (!policy.ok) return { error: policy.reason };
+  // The last-superadmin guard reads a count and then writes — do both inside one
+  // SERIALIZABLE transaction so two admins concurrently demoting the last two
+  // superadmins can't each pass the check and leave the instance with zero (TOCTOU).
+  let outcome: { ok: true } | { error: string };
+  try {
+    outcome = await prisma.$transaction(
+      async (tx) => {
+        const target = await tx.user.findUnique({ where: { id: targetId } });
+        if (!target) return { error: t('userNotFound') };
+        const policy = canChangeRole(actor, target, newRole, await activeSuperadminCount(tx));
+        if (!policy.ok) return { error: t(policy.code ?? 'operationNotPermitted') };
+        await tx.user.update({ where: { id: targetId }, data: { role: newRole } });
+        return { ok: true as const };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  } catch (e) {
+    if (isWriteConflict(e)) return { error: t('retryConflict') };
+    throw e;
+  }
+  if ('error' in outcome) return { error: outcome.error };
 
-  await prisma.user.update({ where: { id: targetId }, data: { role: newRole } });
   // Rotate sessions on privilege change (W1-T5) — force re-auth under the new role.
   await destroyAllSessions(targetId);
   await audit({ actorId: actor.id, action: 'user.role.change', targetType: 'User', targetId, metadata: { newRole } });
   revalidatePath('/admin/users');
-  return { ok: true, notice: 'Role updated.' };
+  return { ok: true, notice: t('roleUpdated') };
 }
 
 export async function toggleActiveAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const actor = await requireRole('ADMIN');
+  const t = await getTranslations('adminErr');
   const targetId = String(formData.get('targetId') ?? '');
   const activate = String(formData.get('activate') ?? '') === '1';
-  const target = await prisma.user.findUnique({ where: { id: targetId } });
-  if (!target) return { error: 'User not found.' };
 
   if (!activate) {
-    const policy = canDeactivate(actor, target, await activeSuperadminCount());
-    if (!policy.ok) return { error: policy.reason };
-    await prisma.user.update({ where: { id: targetId }, data: { status: 'DEACTIVATED' } });
-    await prisma.session.deleteMany({ where: { userId: targetId } }); // kill sessions
+    // Same TOCTOU concern as setRoleAction: count-then-deactivate must be atomic so the
+    // last active superadmin can't be deactivated by two racing requests.
+    let outcome: { ok: true } | { error: string };
+    try {
+      outcome = await prisma.$transaction(
+        async (tx) => {
+          const target = await tx.user.findUnique({ where: { id: targetId } });
+          if (!target) return { error: t('userNotFound') };
+          const policy = canDeactivate(actor, target, await activeSuperadminCount(tx));
+          if (!policy.ok) return { error: t(policy.code ?? 'operationNotPermitted') };
+          await tx.user.update({ where: { id: targetId }, data: { status: 'DEACTIVATED' } });
+          await tx.session.deleteMany({ where: { userId: targetId } }); // kill sessions
+          return { ok: true as const };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (e) {
+      if (isWriteConflict(e)) return { error: t('retryConflict') };
+      throw e;
+    }
+    if ('error' in outcome) return { error: outcome.error };
   } else {
+    const target = await prisma.user.findUnique({ where: { id: targetId } });
+    if (!target) return { error: t('userNotFound') };
     // Reactivation needs the same role gate as deactivation — an admin must not be
     // able to reactivate a superadmin a superadmin had disabled.
     const policy = canReactivate(actor, target);
-    if (!policy.ok) return { error: policy.reason };
+    if (!policy.ok) return { error: t(policy.code!) };
     await prisma.user.update({ where: { id: targetId }, data: { status: 'ACTIVE' } });
   }
   await audit({ actorId: actor.id, action: activate ? 'user.activate' : 'user.deactivate', targetType: 'User', targetId });
   revalidatePath('/admin/users');
-  return { ok: true, notice: activate ? 'User reactivated.' : 'User deactivated.' };
+  return { ok: true, notice: activate ? t('userReactivated') : t('userDeactivated') };
 }
 
 export async function resetUserAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const actor = await requireRole('ADMIN');
+  const t = await getTranslations('adminErr');
   const targetId = String(formData.get('targetId') ?? '');
   const target = await prisma.user.findUnique({ where: { id: targetId } });
-  if (!target) return { error: 'User not found.' };
-  if (target.role === 'SUPERADMIN' && actor.role !== 'SUPERADMIN') return { error: 'Only a superadmin can reset a superadmin.' };
+  if (!target) return { error: t('userNotFound') };
+  if (target.role === 'SUPERADMIN' && actor.role !== 'SUPERADMIN') return { error: t('superadminOnlyReset') };
 
   const { url } = await issueToken('PASSWORD_RESET', target.id);
   await audit({ actorId: actor.id, action: 'user.reset', targetType: 'User', targetId });
@@ -152,17 +195,18 @@ export async function resetUserAction(_prev: AdminState, formData: FormData): Pr
     await sendMagicLink('PASSWORD_RESET', target.email, url);
   } catch (err) {
     logger.error({ err, email: target.email }, '[admin] reset email failed to send');
-    return { error: 'The reset link could not be emailed — check SMTP settings and try again.' };
+    return { error: t('resetEmailFailed') };
   }
-  return { ok: true, notice: `Reset link sent to ${target.email}.` };
+  return { ok: true, notice: t('resetLinkSent', { email: target.email }) };
 }
 
 // ---- Instance settings (superadmin only) ----
 
 export async function updateGeneralSettingsAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const actor = await requireRole('SUPERADMIN');
+  const t = await getTranslations('adminErr');
   const policy = canEditSettings(actor);
-  if (!policy.ok) return { error: policy.reason };
+  if (!policy.ok) return { error: t(policy.code!) };
 
   await updateSettings(
     {
@@ -175,11 +219,12 @@ export async function updateGeneralSettingsAction(_prev: AdminState, formData: F
   );
   await audit({ actorId: actor.id, action: 'settings.general.update', targetType: 'InstanceSettings' });
   revalidatePath('/admin/settings');
-  return { ok: true, notice: 'Settings saved.' };
+  return { ok: true, notice: t('settingsSaved') };
 }
 
 export async function updateSmtpAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const actor = await requireRole('SUPERADMIN');
+  const t = await getTranslations('adminErr');
   const host = String(formData.get('smtpHost') ?? '').trim();
   const password = String(formData.get('smtpPassword') ?? '');
   await updateSettings(
@@ -195,22 +240,23 @@ export async function updateSmtpAction(_prev: AdminState, formData: FormData): P
   );
   await audit({ actorId: actor.id, action: 'settings.smtp.update', targetType: 'InstanceSettings' });
   revalidatePath('/admin/settings');
-  return { ok: true, notice: 'SMTP settings saved.' };
+  return { ok: true, notice: t('smtpSaved') };
 }
 
 export async function updateLlmAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const actor = await requireRole('SUPERADMIN');
+  const t = await getTranslations('adminErr');
   const apiKey = String(formData.get('llmApiKey') ?? '');
   const providerParsed = llmProviderSchema.safeParse(String(formData.get('llmProvider') ?? 'NONE'));
   if (!providerParsed.success) {
-    return { error: 'That LLM provider is not supported yet. Choose None or Ollama.' };
+    return { error: t('llmProviderUnsupported') };
   }
   const llmBaseUrl = String(formData.get('llmBaseUrl') ?? '').trim() || null;
   // SSRF hardening: the base URL is later fetch()'d server-side. We can't block private
   // hosts (a self-hosted Ollama legitimately lives on localhost/a private network), but
   // we restrict the scheme to http(s) so other protocols can't be smuggled in.
   if (llmBaseUrl && !isHttpUrl(llmBaseUrl)) {
-    return { error: 'LLM base URL must be a valid http(s) URL.' };
+    return { error: t('llmUrlInvalid') };
   }
   await updateSettings(
     {
@@ -223,33 +269,35 @@ export async function updateLlmAction(_prev: AdminState, formData: FormData): Pr
   );
   await audit({ actorId: actor.id, action: 'settings.llm.update', targetType: 'InstanceSettings' });
   revalidatePath('/admin/settings');
-  return { ok: true, notice: 'LLM settings saved.' };
+  return { ok: true, notice: t('llmSaved') };
 }
 
 export async function testSmtpAction(): Promise<AdminState> {
   const actor = await requireRole('SUPERADMIN');
+  const t = await getTranslations('adminErr');
   const result = await verifySmtp(actor.email, actor.locale);
-  if (!result.ok) return { error: result.error ?? 'SMTP test failed.' };
+  if (!result.ok) return { error: result.error ?? t('smtpTestFailed') };
   return {
     ok: true,
-    notice: result.sent ? `SMTP OK — a test email was sent to ${actor.email}.` : 'SMTP connection OK.',
+    notice: result.sent ? t('smtpTestSent', { email: actor.email }) : t('smtpTestOk'),
   };
 }
 
 export async function testLlmAction(): Promise<AdminState> {
   await requireRole('SUPERADMIN');
+  const t = await getTranslations('adminErr');
   const provider = await getConfiguredProvider();
   if (!provider.isConfigured()) {
-    return { error: 'No LLM provider is configured. Save a provider, base URL and model first.' };
+    return { error: t('llmNotConfigured') };
   }
   try {
     const healthy = await provider.health();
-    if (!healthy) return { error: `${provider.kind} provider is not reachable (health check failed).` };
+    if (!healthy) return { error: t('llmUnreachable', { provider: provider.kind }) };
     const res = await provider.complete({ system: 'You are a health check.', user: 'ping', maxTokens: 8 });
     const preview = res.text.trim().slice(0, 80);
-    return { ok: true, notice: `${provider.kind} OK — replied: ${preview || '(empty response)'}` };
+    return { ok: true, notice: t('llmTestOk', { provider: provider.kind, preview: preview || '(empty response)' }) };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : 'LLM test failed.' };
+    return { error: e instanceof Error ? e.message : t('llmTestFailed') };
   }
 }
 
@@ -262,44 +310,46 @@ export async function testLlmAction(): Promise<AdminState> {
  */
 export async function probeLlmAction(formData: FormData): Promise<AdminState> {
   await requireRole('SUPERADMIN');
+  const t = await getTranslations('adminErr');
   const provider = String(formData.get('llmProvider') ?? 'NONE');
   const baseUrl = String(formData.get('llmBaseUrl') ?? '').trim();
 
   if (provider === 'OLLAMA') {
-    if (!baseUrl) return { error: 'Enter the Ollama base URL first.' };
-    if (!isHttpUrl(baseUrl)) return { error: 'Base URL must be a valid http(s) URL.' };
+    if (!baseUrl) return { error: t('enterOllamaUrl') };
+    if (!isHttpUrl(baseUrl)) return { error: t('urlInvalid') };
     try {
       const models = await fetchOllamaModels(baseUrl, 2500);
       if (models.length === 0) {
-        return { ok: true, notice: 'Connected, but no models are installed. Run e.g. `ollama pull llama3.1`.', models: [] };
+        return { ok: true, notice: t('ollamaNoModels'), models: [] };
       }
-      return { ok: true, notice: `Connected — found ${models.length} model${models.length === 1 ? '' : 's'}.`, models };
+      return { ok: true, notice: t('ollamaModelsFound', { count: models.length }), models };
     } catch (e) {
-      return { error: e instanceof Error ? e.message : 'Could not reach the Ollama server.' };
+      return { error: e instanceof Error ? e.message : t('ollamaUnreachable') };
     }
   }
 
   if (provider === 'ANTHROPIC' || provider === 'OPENAI') {
-    return { error: `${provider} isn’t available yet. Choose Ollama to auto-detect models.` };
+    return { error: t('llmStubProvider', { provider }) };
   }
-  return { error: 'Select the Ollama provider to check the connection.' };
+  return { error: t('selectOllama') };
 }
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 export async function updateBrandingAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const actor = await requireRole('SUPERADMIN');
+  const t = await getTranslations('adminErr');
   const policy = canEditSettings(actor);
-  if (!policy.ok) return { error: policy.reason };
+  if (!policy.ok) return { error: t(policy.code!) };
 
   const themeColor = String(formData.get('themeColor') ?? '').trim();
-  if (!HEX_COLOR.test(themeColor)) return { error: 'Enter a valid hex color (e.g. #e2553a).' };
+  if (!HEX_COLOR.test(themeColor)) return { error: t('invalidHexColor') };
 
   let brandLogoKey: string | undefined;
   const logo = formData.get('brandLogo');
   if (logo instanceof File && logo.size > 0) {
     const saved = await saveBrandLogo(Buffer.from(await logo.arrayBuffer()));
-    if (!saved.ok) return { error: saved.error ?? 'Could not process the logo.' };
+    if (!saved.ok) return { error: saved.error ?? t('logoFailed') };
     brandLogoKey = saved.key;
   }
 
@@ -313,27 +363,28 @@ export async function updateBrandingAction(_prev: AdminState, formData: FormData
   await audit({ actorId: actor.id, action: 'settings.branding.update', targetType: 'InstanceSettings' });
   revalidatePath('/admin/settings');
   revalidatePath('/', 'layout');
-  return { ok: true, notice: brandLogoKey ? 'Branding saved (logo updated).' : 'Branding saved.' };
+  return { ok: true, notice: brandLogoKey ? t('brandingSavedLogo') : t('brandingSaved') };
 }
 
 // ---- Impersonation (view-as another user) — ADMIN/SUPERADMIN ----
 
 export async function impersonateUserAction(_prev: AdminState, formData: FormData): Promise<AdminState> {
   const admin = await requireRole('ADMIN');
+  const t = await getTranslations('adminErr');
   const targetId = String(formData.get('targetId') ?? '');
-  if (targetId === admin.id) return { error: 'You are already yourself.' };
+  if (targetId === admin.id) return { error: t('alreadyYourself') };
 
   const target = await prisma.user.findUnique({ where: { id: targetId } });
-  if (!target) return { error: 'User not found.' };
-  if (target.status === 'DEACTIVATED') return { error: 'Cannot impersonate a deactivated user.' };
+  if (!target) return { error: t('userNotFound') };
+  if (target.status === 'DEACTIVATED') return { error: t('cannotImpersonateDeactivated') };
   // An admin may not impersonate a superadmin (no upward privilege escalation).
   if (target.role === 'SUPERADMIN' && admin.role !== 'SUPERADMIN') {
-    return { error: 'Only a superadmin can impersonate a superadmin.' };
+    return { error: t('superadminOnlyImpersonate') };
   }
 
   // Avoid nested impersonation: if we're already impersonating, refuse.
   const current = await validateSession();
-  if (current?.impersonatorId) return { error: 'Stop the current impersonation first.' };
+  if (current?.impersonatorId) return { error: t('stopImpersonationFirst') };
 
   const ctx = await getRequestContext();
   // Replace the admin's session with a fresh one for the target, stamped with the
@@ -345,8 +396,9 @@ export async function impersonateUserAction(_prev: AdminState, formData: FormDat
 }
 
 export async function stopImpersonatingAction(): Promise<AdminState> {
+  const t = await getTranslations('adminErr');
   const current = await validateSession();
-  if (!current?.impersonatorId) return { error: 'Not currently impersonating.' };
+  if (!current?.impersonatorId) return { error: t('notImpersonating') };
   const impersonatorId = current.impersonatorId;
   const impersonatedId = current.user.id;
 

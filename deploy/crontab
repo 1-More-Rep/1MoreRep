@@ -7,6 +7,8 @@
 #
 # leaderboard.refresh — keep ranking boards fresh
 */10 * * * *  curl -fsS -m 30 -X POST -H "x-job-secret: $JOB_SECRET" http://app:3000/api/internal/jobs/leaderboard.refresh >/dev/null 2>&1
+# award.reconcile — recover XP for any completed workout whose award didn't land; GC rate-limit windows
+*/10 * * * *  curl -fsS -m 30 -X POST -H "x-job-secret: $JOB_SECRET" http://app:3000/api/internal/jobs/award.reconcile >/dev/null 2>&1
 # streak.rollover — advance/expire streaks
 0 * * * *     curl -fsS -m 30 -X POST -H "x-job-secret: $JOB_SECRET" http://app:3000/api/internal/jobs/streak.rollover >/dev/null 2>&1
 # streak.risk.notify — warn users whose streak is about to lapse

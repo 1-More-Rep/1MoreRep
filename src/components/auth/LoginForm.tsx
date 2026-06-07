@@ -5,14 +5,30 @@ import { useTranslations } from 'next-intl';
 import { loginAction, magicLinkAction, type ActionState } from '@/server/actions/auth';
 import { Btn } from '@/components/ui/Btn';
 import { TextField, Alert, SubmitBtn } from './ui';
+import { PasskeyLoginButton } from './PasskeyLoginButton';
+import { TwoFactorForm } from './TwoFactorForm';
 
 const initial: ActionState = {};
+
+/** Subtle "or" separator between the password form and the passkey button. */
+function OrDivider({ label }: { label: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-3)' }} aria-hidden>
+      <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+      <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
+      <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
+    </div>
+  );
+}
 
 export function LoginForm() {
   const t = useTranslations('auth');
   const [mode, setMode] = useState<'password' | 'magic'>('password');
   const [pwState, pwAction] = useActionState(loginAction, initial);
   const [magicState, magicAction] = useActionState(magicLinkAction, initial);
+
+  // Password was correct but a second factor is required — show the code step.
+  if (pwState.twoFactor) return <TwoFactorForm />;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -44,6 +60,13 @@ export function LoginForm() {
       >
         {mode === 'password' ? t('useMagicLink') : t('usePassword')}
       </Btn>
+
+      {mode === 'password' && (
+        <>
+          <OrDivider label={t('or')} />
+          <PasskeyLoginButton />
+        </>
+      )}
     </div>
   );
 }

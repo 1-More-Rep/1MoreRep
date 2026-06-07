@@ -1,11 +1,13 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { getTranslations } from 'next-intl/server';
 import type { Sex, UnitSystem } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { requireUser } from '@/lib/auth/guards';
 import { issueToken } from '@/lib/auth/tokens';
 import { sendMagicLink } from '@/lib/mail';
+import { logger } from '@/lib/logger';
 import { emailSchema } from '@/lib/validation/auth';
 
 export interface AccountState {
@@ -14,9 +16,10 @@ export interface AccountState {
 }
 
 export async function updateAccountAction(_prev: AccountState, formData: FormData): Promise<AccountState> {
+  const t = await getTranslations('authErr');
   const user = await requireUser();
   const displayName = String(formData.get('displayName') ?? '').trim();
-  if (displayName.length < 1 || displayName.length > 60) return { error: 'Enter a display name.' };
+  if (displayName.length < 1 || displayName.length > 60) return { error: t('enterDisplayName') };
   let timezone = String(formData.get('timezone') ?? 'UTC');
   try {
     Intl.DateTimeFormat(undefined, { timeZone: timezone });
@@ -35,17 +38,24 @@ export async function updateAccountAction(_prev: AccountState, formData: FormDat
     },
   });
   revalidatePath('/app/settings/account');
-  return { notice: 'Account updated.' };
+  return { notice: t('accountUpdated') };
 }
 
 export async function requestEmailChangeAction(_prev: AccountState, formData: FormData): Promise<AccountState> {
+  const t = await getTranslations('authErr');
   const user = await requireUser();
   const parsed = emailSchema.safeParse(formData.get('newEmail'));
-  if (!parsed.success) return { error: 'Enter a valid email.' };
+  if (!parsed.success) return { error: t('enterEmail') };
   const newEmail = parsed.data;
-  if (await prisma.user.findUnique({ where: { email: newEmail } })) return { error: 'That email is already in use.' };
+  if (await prisma.user.findUnique({ where: { email: newEmail } })) return { error: t('emailInUse') };
   await prisma.user.update({ where: { id: user.id }, data: { pendingEmail: newEmail } });
   const { url } = await issueToken('EMAIL_CHANGE', user.id, { payload: { newEmail } });
-  await sendMagicLink('EMAIL_CHANGE', newEmail, url);
-  return { notice: 'Confirmation link sent to the new address.' };
+  // A mail-transport failure must surface as a handled error, not an unhandled 500.
+  try {
+    await sendMagicLink('EMAIL_CHANGE', newEmail, url);
+  } catch (err) {
+    logger.error({ err, userId: user.id }, '[account] email-change confirmation failed to send');
+    return { error: t('emailChangeSendFailed') };
+  }
+  return { notice: t('emailChangeSent') };
 }

@@ -9,13 +9,31 @@ export interface PolicyTarget {
   role: Role;
 }
 
+/**
+ * Stable, locale-independent denial codes. The action layer maps these to a localized
+ * message (i18n namespace `adminErr`, where the keys match these codes) so an admin's
+ * account language governs the text — the domain layer stays free of UI strings.
+ */
+export type PolicyCode =
+  | 'insufficientPrivileges'
+  | 'superadminOnlyManage'
+  | 'adminsCannotGrantRole'
+  | 'cannotDemoteLastSuperadmin'
+  | 'superadminOnlyReactivate'
+  | 'cannotDeactivateSelf'
+  | 'superadminOnlyDeactivate'
+  | 'cannotDeactivateLastSuperadmin'
+  | 'superadminOnlyInvite'
+  | 'adminsCannotInviteRole'
+  | 'superadminOnlyEditSettings';
+
 export interface PolicyResult {
   ok: boolean;
-  reason?: string;
+  code?: PolicyCode;
 }
 
 const ALLOW: PolicyResult = { ok: true };
-const deny = (reason: string): PolicyResult => ({ ok: false, reason });
+const deny = (code: PolicyCode): PolicyResult => ({ ok: false, code });
 
 const RANK: Record<Role, number> = { USER: 0, ADMIN: 1, SUPERADMIN: 2 };
 
@@ -26,26 +44,26 @@ export function canChangeRole(
   newRole: Role,
   superadminCount: number,
 ): PolicyResult {
-  if (RANK[actor.role] < RANK.ADMIN) return deny('Insufficient privileges');
+  if (RANK[actor.role] < RANK.ADMIN) return deny('insufficientPrivileges');
   // Only a superadmin may grant or modify the SUPERADMIN role.
   if ((newRole === 'SUPERADMIN' || target.role === 'SUPERADMIN') && actor.role !== 'SUPERADMIN') {
-    return deny('Only a superadmin can manage superadmins');
+    return deny('superadminOnlyManage');
   }
   // Admins cannot elevate above their own rank.
-  if (actor.role === 'ADMIN' && RANK[newRole] > RANK.ADMIN) return deny('Admins cannot grant that role');
+  if (actor.role === 'ADMIN' && RANK[newRole] > RANK.ADMIN) return deny('adminsCannotGrantRole');
   // Protect the last superadmin from demotion.
   if (target.role === 'SUPERADMIN' && newRole !== 'SUPERADMIN' && superadminCount <= 1) {
-    return deny('Cannot demote the last superadmin');
+    return deny('cannotDemoteLastSuperadmin');
   }
   return ALLOW;
 }
 
 /** Can `actor` reactivate (un-deactivate) `target`? Symmetric to {@link canDeactivate}. */
 export function canReactivate(actor: PolicyActor, target: PolicyTarget): PolicyResult {
-  if (RANK[actor.role] < RANK.ADMIN) return deny('Insufficient privileges');
+  if (RANK[actor.role] < RANK.ADMIN) return deny('insufficientPrivileges');
   // An admin must not be able to override a superadmin's active-state decisions.
   if (target.role === 'SUPERADMIN' && actor.role !== 'SUPERADMIN') {
-    return deny('Only a superadmin can reactivate a superadmin');
+    return deny('superadminOnlyReactivate');
   }
   return ALLOW;
 }
@@ -56,26 +74,26 @@ export function canDeactivate(
   target: PolicyTarget,
   superadminCount: number,
 ): PolicyResult {
-  if (RANK[actor.role] < RANK.ADMIN) return deny('Insufficient privileges');
-  if (actor.id === target.id) return deny('You cannot deactivate yourself');
+  if (RANK[actor.role] < RANK.ADMIN) return deny('insufficientPrivileges');
+  if (actor.id === target.id) return deny('cannotDeactivateSelf');
   if (target.role === 'SUPERADMIN' && actor.role !== 'SUPERADMIN') {
-    return deny('Only a superadmin can deactivate a superadmin');
+    return deny('superadminOnlyDeactivate');
   }
   if (target.role === 'SUPERADMIN' && superadminCount <= 1) {
-    return deny('Cannot deactivate the last superadmin');
+    return deny('cannotDeactivateLastSuperadmin');
   }
   return ALLOW;
 }
 
 /** Can `actor` invite a new user with `newRole`? */
 export function canInvite(actor: PolicyActor, newRole: Role): PolicyResult {
-  if (RANK[actor.role] < RANK.ADMIN) return deny('Insufficient privileges');
-  if (newRole === 'SUPERADMIN' && actor.role !== 'SUPERADMIN') return deny('Only a superadmin can invite superadmins');
-  if (actor.role === 'ADMIN' && RANK[newRole] > RANK.ADMIN) return deny('Admins cannot invite that role');
+  if (RANK[actor.role] < RANK.ADMIN) return deny('insufficientPrivileges');
+  if (newRole === 'SUPERADMIN' && actor.role !== 'SUPERADMIN') return deny('superadminOnlyInvite');
+  if (actor.role === 'ADMIN' && RANK[newRole] > RANK.ADMIN) return deny('adminsCannotInviteRole');
   return ALLOW;
 }
 
 /** Only superadmins may edit instance settings. */
 export function canEditSettings(actor: PolicyActor): PolicyResult {
-  return actor.role === 'SUPERADMIN' ? ALLOW : deny('Only a superadmin can edit instance settings');
+  return actor.role === 'SUPERADMIN' ? ALLOW : deny('superadminOnlyEditSettings');
 }

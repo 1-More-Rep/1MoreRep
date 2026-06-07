@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/server/db/prisma';
+import { logger } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -15,7 +16,10 @@ export async function GET() {
       { status: 'ok', db: 'up', time: new Date().toISOString() },
       { status: 200 },
     );
-  } catch {
+  } catch (err) {
+    // Log the underlying reason — a 503 with no cause is undebuggable when the probe
+    // starts failing in production.
+    logger.error({ err }, '[health] database readiness check failed');
     return NextResponse.json({ status: 'degraded', db: 'down' }, { status: 503 });
   }
 }

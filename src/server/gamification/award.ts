@@ -118,11 +118,16 @@ export async function awardForWorkout(userId: string, sessionId: string, prCount
   const dk = dayKey(now, tz); // daily caps reset at the user's local midnight
   const wk = weekKey(now, 'UTC'); // leagues + weekly XP use a single global week
 
-  // Idempotency safety net (W1-T4): never double-credit a workout. The primary
-  // guard is finishSession short-circuiting on an already-COMPLETED session;
-  // this catches any other re-entry (retry / direct re-invocation).
-  const alreadyAwarded = await prisma.xpEvent.findFirst({ where: { userId, workoutId: sessionId } });
-  if (alreadyAwarded) {
+  // Atomic idempotency + reconcile claim (W1-T4 / H9): flip awardedAt null -> now for
+  // this COMPLETED session. Only the FIRST caller (the finish, or award.reconcile after
+  // a failed award) wins the conditional updateMany; a retry / double-submit / race gets
+  // count 0 and no-ops. Correct even for a zero-XP workout, which writes no XpEvent to
+  // dedupe on. The claim is released on failure below so the reconcile job can retry.
+  const claimedAward = await prisma.workoutSession.updateMany({
+    where: { id: sessionId, status: 'COMPLETED', awardedAt: null },
+    data: { awardedAt: now },
+  });
+  if (claimedAward.count !== 1) {
     const stats = await getOrCreateStats(userId);
     return { xpAwarded: 0, streak: stats.currentStreak, leveledUp: false, newLevel: stats.level };
   }
@@ -172,15 +177,25 @@ export async function awardForWorkout(userId: string, sessionId: string, prCount
     if (oldKgReps < ms && newKgReps >= ms) pending.push({ type: 'VOLUME_MILESTONE', raw: XP.VOLUME_MILESTONE, meta: { milestone: ms } });
   }
 
-  const commit = await awardXp(userId, pending, { now, dk, wk, workoutId: sessionId }, {
-    currentStreak: streakRes.state.current,
-    longestStreak: streakRes.state.longest,
-    lastActiveDay: streakRes.state.lastActiveDay,
-    freezesAvail: streakRes.state.freezes,
-    // Atomic increment (not an absolute write) so concurrent volume credits don't clobber.
-    totalVolume: { increment: BigInt(volumeCentiKg) },
-    totalSessions: { increment: 1 },
-  });
+  let commit;
+  try {
+    commit = await awardXp(userId, pending, { now, dk, wk, workoutId: sessionId }, {
+      currentStreak: streakRes.state.current,
+      longestStreak: streakRes.state.longest,
+      lastActiveDay: streakRes.state.lastActiveDay,
+      freezesAvail: streakRes.state.freezes,
+      // Atomic increment (not an absolute write) so concurrent volume credits don't clobber.
+      totalVolume: { increment: BigInt(volumeCentiKg) },
+      totalSessions: { increment: 1 },
+    });
+  } catch (err) {
+    // The award write failed after we claimed it — release awardedAt (matching only our
+    // own claim timestamp) so award.reconcile re-runs this workout rather than the XP
+    // being lost. A hard crash before this line leaves the claim set, but that residual
+    // window is far smaller than the pre-fix completion→award gap.
+    await prisma.workoutSession.updateMany({ where: { id: sessionId, awardedAt: now }, data: { awardedAt: null } }).catch(() => {});
+    throw err;
+  }
 
   return { xpAwarded: commit.xpAwarded, streak: streakRes.state.current, leveledUp: commit.leveledUp, newLevel: commit.newLevel };
 }

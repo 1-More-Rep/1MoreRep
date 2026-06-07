@@ -44,9 +44,9 @@ export function Alert({ kind, children }: { kind: 'error' | 'notice'; children: 
         lineHeight: 1.4,
         padding: '10px 12px',
         borderRadius: 'var(--r-sm)',
-        background: error ? 'color-mix(in oklab, #d23b3b 12%, var(--surface))' : 'var(--accent-soft)',
-        color: error ? '#c0392b' : 'var(--accent-text)',
-        border: `1px solid ${error ? 'color-mix(in oklab, #d23b3b 30%, var(--surface))' : 'var(--accent-line)'}`,
+        background: error ? 'var(--danger-soft)' : 'var(--accent-soft)',
+        color: error ? 'var(--danger-text)' : 'var(--accent-text)',
+        border: `1px solid ${error ? 'var(--danger-line)' : 'var(--accent-line)'}`,
       }}
     >
       {children}

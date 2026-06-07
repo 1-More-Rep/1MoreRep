@@ -1,4 +1,5 @@
 import { hash, verify } from '@node-rs/argon2';
+import { logger } from '@/lib/logger';
 
 // argon2id parameters (OWASP baseline; tune memoryCost up if the host allows).
 const OPTS = {
@@ -17,7 +18,11 @@ export function hashPassword(plain: string): Promise<string> {
 export async function verifyPassword(storedHash: string, plain: string): Promise<boolean> {
   try {
     return await verify(storedHash, plain, OPTS);
-  } catch {
+  } catch (err) {
+    // verify() rejects on a malformed/foreign hash, not on a normal mismatch (that
+    // returns false). Treat it as a failed login, but log it — a systemic hash-format
+    // problem would otherwise masquerade as everyone suddenly having the wrong password.
+    logger.warn({ err }, '[auth] argon2 verify threw (malformed stored hash?) — treating as failure');
     return false;
   }
 }

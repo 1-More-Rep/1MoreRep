@@ -1,4 +1,5 @@
 import 'server-only';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
 import { daysBetween } from '@/domain/gamification/xp';
 import { awardFriendStreakBonus } from '@/server/gamification/award';
@@ -17,17 +18,35 @@ export async function evaluateFriendStreaks(userId: string, dayKey: string, now:
   if (friends.length === 0) return;
   const since = new Date(now.getTime() - FRIEND_WINDOW_MS);
 
-  for (const fid of friends) {
-    const friendTrained = await prisma.workoutSession.findFirst({
-      where: { ownerId: fid, status: 'COMPLETED', completedAt: { gte: since } },
-      select: { id: true },
-    });
-    if (!friendTrained) continue;
+  // One query for "which friends trained in the window" instead of a findFirst per
+  // friend (was N+1). Only the friends who actually trained need streak processing.
+  const trained = await prisma.workoutSession.findMany({
+    where: { ownerId: { in: friends }, status: 'COMPLETED', completedAt: { gte: since } },
+    select: { ownerId: true },
+    distinct: ['ownerId'],
+  });
+  const trainedSet = new Set(trained.map((s) => s.ownerId));
+  const trainedFriends = friends.filter((fid) => trainedSet.has(fid));
+  if (trainedFriends.length === 0) return;
 
-    const [a, b] = userId < fid ? [userId, fid] : [fid, userId];
-    const pair = await prisma.friendStreak.findUnique({ where: { userAId_userBId: { userAId: a, userBId: b } } });
+  // Load every existing streak row for the trained pairs in ONE query (was a
+  // findUnique per friend). Pair keys are canonicalized (sorted) exactly as written.
+  const canonical = (fid: string) => (userId < fid ? { userAId: userId, userBId: fid } : { userAId: fid, userBId: userId });
+  const existing = await prisma.friendStreak.findMany({ where: { OR: trainedFriends.map(canonical) } });
+  const byPair = new Map(existing.map((row) => [`${row.userAId}|${row.userBId}`, row]));
+
+  for (const fid of trainedFriends) {
+    const { userAId: a, userBId: b } = canonical(fid);
+    const pair = byPair.get(`${a}|${b}`);
     if (!pair) {
-      await prisma.friendStreak.create({ data: { userAId: a, userBId: b, count: 1, lastDayKey: dayKey, active: true } });
+      try {
+        await prisma.friendStreak.create({ data: { userAId: a, userBId: b, count: 1, lastDayKey: dayKey, active: true } });
+      } catch (e) {
+        // A concurrent first workout for the same pair won the create race (unique
+        // constraint on userAId_userBId) — the streak exists, so don't crash.
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') continue;
+        throw e;
+      }
       await awardFriendStreakBonus(userId, dayKey, now);
       continue;
     }

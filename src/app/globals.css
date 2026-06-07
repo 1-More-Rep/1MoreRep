@@ -16,6 +16,13 @@
   --accent-text: color-mix(in oklab, var(--accent) 58%, #000);
   --on-accent: #fffaf6;
 
+  /* danger / error surface (alerts). --danger-text is theme-overridden for AA contrast;
+     soft/line derive from --surface so they adapt automatically. */
+  --danger: #d23b3b;
+  --danger-text: color-mix(in oklab, var(--danger) 72%, #000);
+  --danger-soft: color-mix(in oklab, var(--danger) 12%, var(--surface));
+  --danger-line: color-mix(in oklab, var(--danger) 30%, var(--surface));
+
   /* light palette */
   --bg: #f1eee6;
   --bg-2: #e8e4da;
@@ -51,6 +58,9 @@
 [data-theme='dark'] {
   --on-accent: #fffaf6;
   --accent-text: color-mix(in oklab, var(--accent) 78%, white);
+  /* lighten danger text so it clears AA on the dark surface (the old hard-coded
+     #c0392b on a near-black tint failed contrast). */
+  --danger-text: color-mix(in oklab, var(--danger) 26%, white);
 
   --bg: #141310;
   --bg-2: #0e0d0a;
@@ -76,6 +86,7 @@
   :root:not([data-theme]) {
     --on-accent: #fffaf6;
     --accent-text: color-mix(in oklab, var(--accent) 78%, white);
+    --danger-text: color-mix(in oklab, var(--danger) 26%, white);
     --bg: #141310;
     --bg-2: #0e0d0a;
     --surface: #1d1b16;
@@ -183,10 +194,41 @@ body {
   outline-offset: 2px;
 }
 
-/* 2D body map: silhouette is decorative; each muscle region owns its full bbox */
+/* 2D body map: the silhouette is decorative; each muscle region is hit-tested on
+ * its painted shape only. Regions are disjoint, so a tap lands on exactly the
+ * muscle under the cursor. (An earlier `pointer-events: bounding-box` made each
+ * group's whole overlapping bounding box hot — tapping abs selected biceps, etc.) */
 .bodymap-silhouette {
   pointer-events: none;
 }
 .bodymap-region {
-  pointer-events: bounding-box;
+  pointer-events: auto;
+}
+
+/* ----------------------------------------------------------------------------
+ * Desktop hover affordances. Interactive elements are styled with inline styles
+ * (so a CSS rule can't override their background/box-shadow); hover therefore uses
+ * `filter`, which composes on top of any inline paint. Gated to real pointers so
+ * touch devices don't get stuck in a :hover state after a tap.
+ * ------------------------------------------------------------------------------ */
+@media (hover: hover) and (pointer: fine) {
+  a[href],
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  summary {
+    transition:
+      filter 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  a[href]:hover,
+  button:not(:disabled):hover,
+  [role='button']:not([aria-disabled='true']):hover,
+  summary:hover,
+  .bodymap-region:hover {
+    filter: brightness(1.06);
+  }
+  button:not(:disabled):active,
+  [role='button']:not([aria-disabled='true']):active {
+    filter: brightness(0.95);
+  }
 }

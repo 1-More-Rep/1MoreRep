@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import type { InstanceSettings } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/server/db/prisma';
@@ -32,8 +33,12 @@ const DEFAULT_SETTINGS: InstanceSettings = {
   updatedById: null,
 };
 
-/** Fetch the singleton instance settings (creating defaults on first access). */
-export async function getSettings(): Promise<InstanceSettings> {
+/**
+ * Fetch the singleton instance settings (creating defaults on first access).
+ * Wrapped in React `cache()` so the many callers within a single request/render
+ * (layout brand, metadata, manifest, multiple actions) share one DB round-trip.
+ */
+export const getSettings = cache(async (): Promise<InstanceSettings> => {
   try {
     return await prisma.instanceSettings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
   } catch (e) {
@@ -43,7 +48,7 @@ export async function getSettings(): Promise<InstanceSettings> {
     if (e instanceof Prisma.PrismaClientInitializationError) return DEFAULT_SETTINGS;
     throw e;
   }
-}
+});
 
 export async function updateSettings(
   patch: Prisma.InstanceSettingsUpdateInput,

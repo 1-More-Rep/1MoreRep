@@ -56,9 +56,20 @@ export function sha256(input: string): string {
   return crypto.createHash('sha256').update(input).digest('hex');
 }
 
+/**
+ * Keyed (HMAC-SHA256) hash. The key is derived from APP_KEY, which lives in the
+ * environment, never in the database — so a hash produced here is useless to an
+ * attacker who only exfiltrates the DB (they cannot recompute or brute-force it
+ * offline without APP_KEY). Used as a "pepper" for low-entropy secrets such as
+ * recovery codes. Callers should domain-separate the input (e.g. `'bk:' + code`).
+ */
+export function hmac(input: string): string {
+  return crypto.createHmac('sha256', key()).update(input).digest('hex');
+}
+
 /** Keyed hash for IPs — correlate abuse without storing PII. */
 export function hmacIp(ip: string): string {
-  return crypto.createHmac('sha256', key()).update(ip).digest('hex');
+  return hmac(ip);
 }
 
 /** URL-safe random token with `bytes` of entropy (default 256 bits). */

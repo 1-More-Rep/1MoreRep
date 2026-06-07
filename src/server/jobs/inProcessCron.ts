@@ -21,7 +21,7 @@ const HOUR = 60 * MINUTE;
 type Schedule = { jobs: string[]; everyMs: number };
 
 const SCHEDULES: Schedule[] = [
-  { jobs: ['leaderboard.refresh'], everyMs: 10 * MINUTE },
+  { jobs: ['leaderboard.refresh', 'award.reconcile'], everyMs: 10 * MINUTE },
   { jobs: ['streak.rollover', 'streak.risk.notify', 'league.settle'], everyMs: HOUR },
 ];
 

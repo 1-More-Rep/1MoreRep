@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslations } from 'next-intl';
 import type { CSSProperties, ReactNode } from 'react';
 import { Icon } from './Icon';
@@ -18,6 +19,12 @@ export interface SheetProps {
   maxWidth?: number;
   /** aria-label when no visible title is given. */
   ariaLabel?: string;
+  /**
+   * When false, Escape and overlay-click do NOT close and the header X is hidden, so
+   * the only way out is an explicit in-content action. Use for one-time content that
+   * must not be lost to an accidental dismiss (e.g. freshly generated backup codes).
+   */
+  dismissible?: boolean;
 }
 
 /**
@@ -34,11 +41,15 @@ export function Sheet({
   children,
   maxWidth = 440,
   ariaLabel,
+  dismissible = true,
 }: SheetProps) {
   const t = useTranslations('ui');
   const sheetRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const dismissibleRef = useRef(dismissible);
+  dismissibleRef.current = dismissible;
 
   useEffect(() => {
     if (!open) return;
@@ -59,6 +70,7 @@ export function Sheet({
 
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
+        if (!dismissibleRef.current) return; // locked sheet — Escape must not discard content
         e.preventDefault();
         onCloseRef.current();
         return;
@@ -81,11 +93,17 @@ export function Sheet({
     return () => {
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prevOverflow;
-      prevFocus?.focus?.();
+      // Only restore focus to the trigger if it's still in the DOM — a sheet closed via
+      // router.refresh() unmounts its trigger, and focusing a detached node is a no-op
+      // that strands focus on <body>. Skipping lets the refreshed page manage focus.
+      if (prevFocus && document.contains(prevFocus)) prevFocus.focus?.();
     };
   }, [open]);
 
-  if (!open) return null;
+  // Portal to <body> so the overlay escapes any ancestor stacking context (the
+  // sticky mobile header/tab bar are z-indexed siblings — without this the bottom
+  // tab bar paints OVER the sheet and hides its lower entries).
+  if (!open || typeof document === 'undefined') return null;
 
   const overlay: CSSProperties = {
     position: 'fixed',
@@ -95,7 +113,12 @@ export function Sheet({
     alignItems: side === 'bottom' ? 'flex-end' : 'center',
     justifyContent: 'center',
     zIndex: 60,
-    padding: 16,
+    // Reserve the device safe areas (home indicator / notch) so a bottom sheet's
+    // last row is never clipped behind the home indicator or browser chrome.
+    paddingTop: 'calc(16px + env(safe-area-inset-top, 0px))',
+    paddingRight: 16,
+    paddingBottom: side === 'bottom' ? 'calc(16px + env(safe-area-inset-bottom, 0px))' : 16,
+    paddingLeft: 16,
     animation: 'sheetFade .16s ease',
   };
   const sheet: CSSProperties = {
@@ -106,24 +129,32 @@ export function Sheet({
     padding: 'calc(var(--pad) * 1.1)',
     width: '100%',
     maxWidth,
-    maxHeight: 'calc(100dvh - 32px)',
+    // Fit within the visible viewport minus the overlay padding + safe areas, so
+    // the sheet always scrolls internally instead of overflowing off-screen.
+    maxHeight:
+      side === 'bottom'
+        ? 'calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))'
+        : 'calc(100dvh - 32px)',
     overflowY: 'auto',
-    marginBottom: side === 'bottom' ? 'env(safe-area-inset-bottom, 0)' : 0,
+    overscrollBehavior: 'contain',
     animation: side === 'bottom' ? 'sheetUp .2s cubic-bezier(.2,.7,.3,1)' : 'sheetPop .18s cubic-bezier(.2,.7,.3,1)',
   };
 
-  return (
+  return createPortal(
     <div
       style={overlay}
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget && dismissible) onClose();
       }}
     >
       <div
         ref={sheetRef}
         role="dialog"
         aria-modal="true"
-        aria-label={typeof title === 'string' ? title : ariaLabel}
+        // Prefer associating the visible title (aria-labelledby) so the rendered heading
+        // IS the accessible name; fall back to aria-label only when there's no title.
+        aria-labelledby={title ? titleId : undefined}
+        aria-label={title ? undefined : ariaLabel}
         style={sheet}
       >
         {!hideHeader && (
@@ -136,31 +167,34 @@ export function Sheet({
               marginBottom: title ? 14 : 0,
             }}
           >
-            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{title}</div>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t('close')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 34,
-                height: 34,
-                borderRadius: 'var(--r-pill)',
-                border: '1px solid var(--line)',
-                background: 'var(--surface-2)',
-                color: 'var(--text-2)',
-                cursor: 'pointer',
-                flexShrink: 0,
-              }}
-            >
-              <Icon name="x" size={18} stroke={2} />
-            </button>
+            <div id={titleId} style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)' }}>{title}</div>
+            {dismissible && (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={t('close')}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 34,
+                  height: 34,
+                  borderRadius: 'var(--r-pill)',
+                  border: '1px solid var(--line)',
+                  background: 'var(--surface-2)',
+                  color: 'var(--text-2)',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+              >
+                <Icon name="x" size={18} stroke={2} />
+              </button>
+            )}
           </div>
         )}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

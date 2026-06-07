@@ -9,6 +9,8 @@ export const dynamic = 'force-dynamic';
 const SECTIONS: { href: string; icon: IconName; titleKey: string; descKey: string }[] = [
   { href: '/app/settings/account', icon: 'user', titleKey: 'account', descKey: 'accountDesc' },
   { href: '/app/settings/appearance', icon: 'sun', titleKey: 'appearance', descKey: 'appearanceDesc' },
+  { href: '/app/settings/language', icon: 'globe', titleKey: 'language', descKey: 'languageDesc' },
+  { href: '/app/settings/security', icon: 'shield', titleKey: 'security', descKey: 'securityDesc' },
   { href: '/app/settings/privacy', icon: 'settings', titleKey: 'privacy', descKey: 'privacyDesc' },
   { href: '/app/settings/notifications', icon: 'bolt', titleKey: 'notifications', descKey: 'notificationsDesc' },
   { href: '/app/settings/sessions', icon: 'settings', titleKey: 'sessions', descKey: 'sessionsDesc' },

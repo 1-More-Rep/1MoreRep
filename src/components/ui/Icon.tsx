@@ -171,6 +171,18 @@ const ICON_PATHS = {
       <path d="M14 14h3v3M20 14v6M14 20h3" />
     </>
   ),
+  shield: (
+    <>
+      <path d="M12 3 5 5.5v5.7c0 4.3 2.9 7.3 7 8.8 4.1-1.5 7-4.5 7-8.8V5.5L12 3Z" />
+      <path d="M9 11.8 11.2 14l4-4.2" />
+    </>
+  ),
+  key: (
+    <>
+      <circle cx="8" cy="14" r="4" />
+      <path d="M10.8 11.2 20 2M16.5 5.5 19 8M14 8l2.2 2.2" />
+    </>
+  ),
 } satisfies Record<string, JSX.Element>;
 
 export type IconName = keyof typeof ICON_PATHS;

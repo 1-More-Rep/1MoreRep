@@ -8,9 +8,15 @@ import { Segmented } from '@/components/ui/Segmented';
 type View = 'front' | 'back';
 
 /**
- * 2D body silhouette with clickable muscle regions. Mode-agnostic: the caller
- * supplies `tint(muscle)` (region fill) and `regionLabel(muscle)` (aria-label),
- * so the same SVG drives both the fatigue and strength views.
+ * 2D body map with clickable muscle regions. Mode-agnostic: the caller supplies
+ * `tint(muscle)` (region fill) and `regionLabel(muscle)` (aria-label), so the same
+ * figure drives both the fatigue and strength views.
+ *
+ * Each muscle is a self-contained, NON-OVERLAPPING shape (or a mirrored pair), and
+ * only the painted shape is clickable — see `.bodymap-region` in globals.css. This
+ * is deliberate: an earlier version used `pointer-events: bounding-box`, which made
+ * each group's whole (overlapping) bounding box hot, so taps landed on the wrong
+ * muscle. Keep regions disjoint and never reintroduce bounding-box hit-testing.
  */
 export function BodyMap({
   tint,
@@ -30,6 +36,10 @@ export function BodyMap({
 
   function Region({ muscle, children }: { muscle: Muscle; children: React.ReactNode }) {
     const isSel = selected === muscle;
+    // Keyboard focus must be visible (WCAG 2.4.7). A CSS :focus-visible rule can't win
+    // against the inline stroke, so track focus and paint an accent stroke + halo that
+    // shows regardless of the region's fill colour.
+    const [focused, setFocused] = useState(false);
     return (
       <g
         role="button"
@@ -38,21 +48,31 @@ export function BodyMap({
         aria-label={regionLabel(muscle)}
         aria-pressed={isSel}
         onClick={() => onSelect?.(muscle)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault(); // Space would otherwise scroll the page on activate
             onSelect?.(muscle);
           }
         }}
-        style={{ cursor: onSelect ? 'pointer' : 'default', fill: tint(muscle), stroke: isSel ? 'var(--accent)' : 'var(--line-2)', strokeWidth: isSel ? 1.6 : 0.7, transition: 'fill .3s' }}
+        style={{
+          cursor: onSelect ? 'pointer' : 'default',
+          fill: tint(muscle),
+          stroke: isSel || focused ? 'var(--accent)' : 'var(--line-2)',
+          strokeWidth: focused ? 3 : isSel ? 2 : 0.8,
+          strokeLinejoin: 'round',
+          filter: focused ? 'drop-shadow(0 0 3px var(--accent))' : undefined,
+          transition: 'fill .3s, stroke .15s, stroke-width .15s',
+        }}
       >
         {children}
       </g>
     );
   }
 
-  // mirror helper: render a shape at x and mirrored across the 60 centerline
-  const M = (x: number) => 120 - x;
+  // Mirror an x-coordinate across the figure's centerline (viewBox is 240 wide).
+  const M = (x: number) => 240 - x;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
@@ -68,44 +88,55 @@ export function BodyMap({
         style={{ width: 180 }}
       />
 
-      <svg role="img" viewBox="0 0 120 250" width="100%" style={{ maxWidth: 280, display: 'block' }} aria-label={t('mapAria', { title, view: view === 'front' ? t('front') : t('back') })}>
-        {/* silhouette (non-interactive so muscle regions own the clicks) */}
-        <g className="bodymap-silhouette" style={{ fill: 'var(--surface)', stroke: 'var(--line)', strokeWidth: 1 }}>
-          <ellipse cx="60" cy="22" rx="13" ry="15" /> {/* head */}
-          <rect x="54" y="35" width="12" height="8" rx="3" /> {/* neck */}
-          <path d="M40 44 H80 Q92 46 92 60 L88 96 Q86 104 80 104 H40 Q34 104 32 96 L28 60 Q28 46 40 44 Z" /> {/* torso */}
-          <path d="M34 50 Q22 54 20 78 L17 104 Q16 110 21 110 Q26 110 27 104 L31 80 Z" /> {/* left arm */}
-          <path d={`M86 50 Q98 54 100 78 L103 104 Q104 110 99 110 Q94 110 93 104 L89 80 Z`} /> {/* right arm */}
-          <path d="M40 104 H80 L78 170 Q77 178 70 178 H64 L62 184 H58 L56 178 H50 Q43 178 42 170 Z" /> {/* hips/thighs */}
-          <rect x="46" y="176" width="12" height="60" rx="5" /> {/* left lower leg */}
-          <rect x="62" y="176" width="12" height="60" rx="5" /> {/* right lower leg */}
+      <svg
+        role="img"
+        viewBox="0 0 240 372"
+        width="100%"
+        style={{ maxWidth: 300, display: 'block' }}
+        aria-label={t('mapAria', { title, view: view === 'front' ? t('front') : t('back') })}
+      >
+        {/* Decorative silhouette (head, limbs, joints, feet) — never owns clicks;
+            the muscle regions sit on top and own hit-testing. */}
+        <g className="bodymap-silhouette" style={{ fill: 'var(--surface-2)', stroke: 'var(--line)', strokeWidth: 1.2 }}>
+          <circle cx="120" cy="34" r="19" />
+          <rect x="110" y="46" width="20" height="16" rx="6" />
+          <path d="M70 84 Q70 68 94 66 L146 66 Q170 68 170 84 L158 182 Q156 202 144 206 L96 206 Q84 202 82 182 Z" />
+          <rect x="52" y="80" width="26" height="126" rx="13" />
+          <rect x="162" y="80" width="26" height="126" rx="13" />
+          <circle cx="64" cy="210" r="10" />
+          <circle cx="176" cy="210" r="10" />
+          <rect x="83" y="196" width="74" height="22" rx="11" />
+          <rect x="83" y="206" width="32" height="152" rx="15" />
+          <rect x="125" y="206" width="32" height="152" rx="15" />
+          <ellipse cx="97" cy="362" rx="13" ry="7" />
+          <ellipse cx="143" cy="362" rx="13" ry="7" />
         </g>
 
         {view === 'front' ? (
           <>
-            <Region muscle="NECK"><rect x="55" y="36" width="10" height="7" rx="3" /></Region>
-            <Region muscle="FRONT_DELTS"><ellipse cx="36" cy="52" rx="7" ry="6" /><ellipse cx={M(36)} cy="52" rx="7" ry="6" /></Region>
-            <Region muscle="SIDE_DELTS"><ellipse cx="30" cy="56" rx="4" ry="5" /><ellipse cx={M(30)} cy="56" rx="4" ry="5" /></Region>
-            <Region muscle="CHEST"><rect x="40" y="50" width="17" height="16" rx="5" /><rect x={M(57)} y="50" width="17" height="16" rx="5" /></Region>
-            <Region muscle="ABS"><rect x="52" y="70" width="16" height="28" rx="4" /></Region>
-            <Region muscle="OBLIQUES"><rect x="40" y="72" width="8" height="24" rx="3" /><rect x={M(48)} y="72" width="8" height="24" rx="3" /></Region>
-            <Region muscle="BICEPS"><ellipse cx="25" cy="72" rx="5" ry="9" /><ellipse cx={M(25)} cy="72" rx="5" ry="9" /></Region>
-            <Region muscle="FOREARMS"><ellipse cx="20" cy="96" rx="4" ry="9" /><ellipse cx={M(20)} cy="96" rx="4" ry="9" /></Region>
-            <Region muscle="QUADS"><rect x="44" y="108" width="14" height="54" rx="6" /><rect x={M(58)} y="108" width="14" height="54" rx="6" /></Region>
-            <Region muscle="ADDUCTORS"><rect x="56" y="110" width="8" height="40" rx="3" /></Region>
+            <Region muscle="NECK"><rect x="111" y="49" width="18" height="12" rx="5" /></Region>
+            <Region muscle="SIDE_DELTS"><ellipse cx="72" cy="79" rx="9" ry="11" /><ellipse cx={M(72)} cy="79" rx="9" ry="11" /></Region>
+            <Region muscle="FRONT_DELTS"><ellipse cx="90" cy="80" rx="14" ry="12" /><ellipse cx={M(90)} cy="80" rx="14" ry="12" /></Region>
+            <Region muscle="CHEST"><rect x="99" y="80" width="19" height="32" rx="8" /><rect x={M(118)} y="80" width="19" height="32" rx="8" /></Region>
+            <Region muscle="BICEPS"><rect x="62" y="96" width="18" height="46" rx="9" /><rect x={M(80)} y="96" width="18" height="46" rx="9" /></Region>
+            <Region muscle="FOREARMS"><rect x="60" y="150" width="18" height="50" rx="9" /><rect x={M(78)} y="150" width="18" height="50" rx="9" /></Region>
+            <Region muscle="ABS"><rect x="107" y="116" width="26" height="52" rx="7" /></Region>
+            <Region muscle="OBLIQUES"><rect x="94" y="118" width="10" height="44" rx="5" /><rect x={M(104)} y="118" width="10" height="44" rx="5" /></Region>
+            <Region muscle="QUADS"><rect x="85" y="206" width="21" height="80" rx="11" /><rect x={M(106)} y="206" width="21" height="80" rx="11" /></Region>
+            <Region muscle="ADDUCTORS"><path d="M108 212 L118 212 L115 262 Q111 262 108 252 Z" /><path d="M132 212 L122 212 L125 262 Q129 262 132 252 Z" /></Region>
           </>
         ) : (
           <>
-            <Region muscle="TRAPS"><path d="M48 44 H72 L66 64 H54 Z" /></Region>
-            <Region muscle="REAR_DELTS"><ellipse cx="35" cy="53" rx="7" ry="6" /><ellipse cx={M(35)} cy="53" rx="7" ry="6" /></Region>
-            <Region muscle="RHOMBOIDS"><rect x="50" y="58" width="20" height="14" rx="3" /></Region>
-            <Region muscle="LATS"><path d="M40 64 L34 92 Q44 96 50 86 L52 66 Z" /><path d={`M80 64 L86 92 Q76 96 70 86 L68 66 Z`} /></Region>
-            <Region muscle="LOWER_BACK"><rect x="50" y="86" width="20" height="16" rx="4" /></Region>
-            <Region muscle="TRICEPS"><ellipse cx="25" cy="72" rx="5" ry="9" /><ellipse cx={M(25)} cy="72" rx="5" ry="9" /></Region>
-            <Region muscle="FOREARMS"><ellipse cx="20" cy="96" rx="4" ry="9" /><ellipse cx={M(20)} cy="96" rx="4" ry="9" /></Region>
-            <Region muscle="GLUTES"><ellipse cx="51" cy="116" rx="9" ry="10" /><ellipse cx={M(51)} cy="116" rx="9" ry="10" /></Region>
-            <Region muscle="HAMSTRINGS"><rect x="44" y="128" width="14" height="42" rx="6" /><rect x={M(58)} y="128" width="14" height="42" rx="6" /></Region>
-            <Region muscle="CALVES"><rect x="47" y="182" width="10" height="44" rx="5" /><rect x={M(57)} y="182" width="10" height="44" rx="5" /></Region>
+            <Region muscle="TRAPS"><path d="M120 60 Q139 66 134 88 L126 106 L114 106 L106 88 Q101 66 120 60 Z" /></Region>
+            <Region muscle="REAR_DELTS"><ellipse cx="90" cy="80" rx="13" ry="11" /><ellipse cx={M(90)} cy="80" rx="13" ry="11" /></Region>
+            <Region muscle="TRICEPS"><rect x="62" y="96" width="18" height="46" rx="9" /><rect x={M(80)} y="96" width="18" height="46" rx="9" /></Region>
+            <Region muscle="FOREARMS"><rect x="60" y="150" width="18" height="50" rx="9" /><rect x={M(78)} y="150" width="18" height="50" rx="9" /></Region>
+            <Region muscle="RHOMBOIDS"><rect x="107" y="110" width="26" height="20" rx="5" /></Region>
+            <Region muscle="LATS"><path d="M82 96 Q72 124 98 152 L106 150 Q106 114 100 98 Z" /><path d="M158 96 Q168 124 142 152 L134 150 Q134 114 140 98 Z" /></Region>
+            <Region muscle="LOWER_BACK"><rect x="107" y="134" width="26" height="26" rx="6" /></Region>
+            <Region muscle="GLUTES"><ellipse cx="103" cy="190" rx="19" ry="15" /><ellipse cx={M(103)} cy="190" rx="19" ry="15" /></Region>
+            <Region muscle="HAMSTRINGS"><rect x="86" y="212" width="22" height="72" rx="11" /><rect x={M(108)} y="212" width="22" height="72" rx="11" /></Region>
+            <Region muscle="CALVES"><rect x="90" y="290" width="20" height="54" rx="10" /><rect x={M(110)} y="290" width="20" height="54" rx="10" /></Region>
           </>
         )}
       </svg>
